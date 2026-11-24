@@ -67,3 +67,4 @@
 - **2026-11-24 (Etapa 4):** Refinamento final de UI/UX (Fase 4) no Dashboard, Calculadora, Tabelas/Serviços, Mobile, Modo Escuro e Orçamento A4.
 - **2026-11-24 (Etapa 5):** Integração da identidade visual oficial (`public/brand/*` + `BrandLogo.tsx`, Fase 5) e validação visual completa.
 - **2026-11-24 (Etapa 6):** Fases 7 e 8 concluídas — instalação do Git (`2.56.1`) e GitHub CLI (`2.105.0`), commit `5c6a27d` + tag `v1.0.0` enviados ao GitHub, publicação em produção na Vercel (`https://preco-justo-tau.vercel.app`), validação integral na URL pública, execução do Vercel Doctor e sincronização da documentação final.
+- **2026-11-24 (Etapa 7):** Adição do rodapé institucional de direitos autorais (`© 2026 Preço Justo. Todos os direitos reservados a Yago Alves.`) em `src/components/Layout.tsx`, sincronização com o GitHub e republicação em produção na Vercel.

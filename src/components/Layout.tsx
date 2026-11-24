@@ -288,6 +288,16 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           )}
           {children}
         </main>
+
+        {/* Footer */}
+        <footer className="mx-auto w-full max-w-6xl px-4 pb-6 pt-2 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center justify-between gap-1.5 border-t border-gray-200/80 pt-4 text-center text-xs text-gray-500 dark:border-slate-800 dark:text-slate-400 sm:flex-row sm:text-left">
+            <p>© {new Date().getFullYear()} Preço Justo. Todos os direitos reservados a Yago Alves.</p>
+            <p className="text-gray-400 dark:text-slate-500">
+              Seu trabalho tem valor. Saiba quanto cobrar.
+            </p>
+          </div>
+        </footer>
       </div>
     </div>
   );
