@@ -52,7 +52,7 @@ O **Preço Justo** transforma o cálculo de precificação em um fluxo guiado, t
 
 ## Principais funcionalidades
 
-- **Visão geral (Dashboard)**: valor recomendado da hora de trabalho, custos operacionais mensais, total de serviços cadastrados, faturamento mensal desejado, **recomendações inteligentes** baseadas em regras matemáticas locais, gráfico de distribuição de custos, últimas precificações e atalho rápido *"Calcular novo serviço"*.
+- **Visão geral (Dashboard)**: valor recomendado da hora de trabalho, custos operacionais mensais (automáticos ou manuais), total de serviços cadastrados, faturamento mensal alvo (bruto, com cobertura base de pró-labore + custos + margem e impostos), **recomendações inteligentes** baseadas em regras matemáticas locais, gráfico de distribuição de custos, últimas precificações e atalho rápido *"Calcular novo serviço"*.
 - **Calculadora de preços em 3 etapas**:
   - *Etapa 1 — Perfil financeiro*: remuneração mensal desejada, custos fixos mensais (sincronizados automaticamente com *Custos mensais*), dias trabalhados/mês, horas produtivas/dia e percentual de horas faturáveis.
   - *Etapa 2 — Informações do serviço*: nome, categoria, descrição, horas necessárias, custos adicionais, margem de lucro desejada (% sobre venda) e impostos/taxas (% sobre venda).
@@ -60,11 +60,11 @@ O **Preço Justo** transforma o cálculo de precificação em um fluxo guiado, t
 - **Planejamento de metas**: definição da meta de faturamento mensal, cálculo de vendas necessárias por serviço, análise de ocupação da capacidade de horas faturáveis, simulador de mix mensal de serviços e simulador rápido de ticket.
 - **Onboarding guiado**: introdução curta em 3 passos para novos usuários configurarem o perfil financeiro e realizarem o primeiro cálculo (reacessível em Configurações).
 - **Custos mensais**: cadastro, edição, exclusão e filtragem de despesas por categoria (*Internet, Energia elétrica, Softwares e assinaturas, Equipamentos, Transporte, Aluguel, Contabilidade e Outros*) com soma automática integrada à calculadora.
-- **Meus serviços**: cadastro completo com pesquisa, filtro por categoria, ordenação, edição, exclusão, recálculo na calculadora e geração direta de orçamento.
-- **Histórico de cálculos**: consulta detalhada, duplicação e exclusão de cálculos anteriores.
-- **Gerador de orçamento profissional em PDF**: pré-visualização em folha A4 e impressão/exportação em PDF com dados do profissional, cliente, serviço, escopo, valor final, emissão, validade e observações — ocultando custos internos e margem de lucro.
-- **Dados demonstrativos**: carregamento com um clique de despesas, serviços de exemplo (*Design de post para Instagram, Criação de identidade visual, Edição de vídeo, Desenvolvimento de landing page e Gestão de redes sociais*) e histórico, todos identificados como demonstrativos e removíveis a qualquer momento.
-- **Configurações**: dados do profissional para orçamentos, padrões da calculadora, modo claro/escuro e backup/restauração em JSON.
+- **Meus serviços**: cadastro completo com pesquisa, filtro por categoria, ordenação, edição (incluindo margem e impostos individuais), exclusão, recálculo na calculadora e geração direta de orçamento.
+- **Histórico de cálculos**: consulta detalhada, duplicação, reabertura fiel na calculadora (preservando parâmetros históricos) e exclusão de cálculos anteriores.
+- **Gerador de orçamento profissional em PDF**: pré-visualização em folha A4 com identidade visual oficial do Preço Justo, impressão/exportação em PDF com paginação multipágina segura, dados do profissional, cliente, serviço, escopo, valor final, emissão, validade e observações — ocultando custos internos e margem de lucro.
+- **Dados demonstrativos**: carregamento com um clique de despesas, serviços de exemplo (*Design de post para Instagram, Criação de identidade visual, Edição de vídeo, Desenvolvimento de landing page e Gestão de redes sociais*), meta mensal sugerida e histórico, todos identificados como demonstrativos e removíveis a qualquer momento.
+- **Configurações**: dados do profissional para orçamentos, padrões da calculadora, modo claro/escuro e backup/restauração em JSON com validação estrutural, sanitização profunda, modal de confirmação e avisos em caso de indisponibilidade do `LocalStorage`.
 
 ---
 

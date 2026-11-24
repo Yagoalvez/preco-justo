@@ -9,8 +9,12 @@ import {
   TrendingDown,
 } from 'lucide-react';
 import { PricingCalculationResult } from '../types';
-import { diagnoseCurrentPrice, simulateNegotiationDiscount } from '../utils/pricing';
-import { formatCurrencyBRL, formatPercent } from '../utils/format';
+import {
+  diagnoseCurrentPrice,
+  floorToDecimals,
+  simulateNegotiationDiscount,
+} from '../utils/pricing';
+import { formatCurrencyBRL, formatPercent, parseNumericInput } from '../utils/format';
 
 interface PricingAnalysisPanelProps {
   serviceName: string;
@@ -28,8 +32,8 @@ export const PricingAnalysisPanel: React.FC<PricingAnalysisPanelProps> = ({
   const [currentPriceStr, setCurrentPriceStr] = useState<string>('');
   const [discountStr, setDiscountStr] = useState<string>('0');
 
-  const parsedCurrentPrice = currentPriceStr.trim() === '' ? NaN : Number(currentPriceStr.replace(',', '.'));
-  const parsedDiscount = discountStr.trim() === '' ? 0 : Number(discountStr.replace(',', '.'));
+  const parsedCurrentPrice = parseNumericInput(currentPriceStr, NaN);
+  const parsedDiscount = parseNumericInput(discountStr, 0);
 
   const diagnosis = useMemo(() => {
     if (!Number.isFinite(parsedCurrentPrice) || parsedCurrentPrice <= 0) return null;
@@ -58,19 +62,24 @@ export const PricingAnalysisPanel: React.FC<PricingAnalysisPanelProps> = ({
     return Math.max(0, ((result.precoRecomendado - result.precoMinimo) / result.precoRecomendado) * 100);
   }, [result.precoRecomendado, result.precoMinimo]);
 
+  const safeLimitPresetPercent = useMemo(
+    () => floorToDecimals(maxSafeDiscountPercent, 1),
+    [maxSafeDiscountPercent]
+  );
+
   const diagnosisBadge = () => {
     if (!diagnosis) return null;
     switch (diagnosis.status) {
       case 'loss':
         return (
-          <div className="rounded-xl border border-red-200 bg-red-50/90 p-3.5 dark:border-red-900/70 dark:bg-red-950/40">
+          <div className="rounded-xl border border-red-200 bg-red-50/90 p-4 dark:border-red-800/70 dark:bg-red-950/45">
             <div className="flex items-start gap-2.5">
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
-              <div className="text-xs">
+              <div className="text-[13px]">
                 <p className="font-bold text-red-800 dark:text-red-300">
                   Prejuízo operacional confirmado
                 </p>
-                <p className="mt-0.5 leading-relaxed text-red-700 dark:text-red-300/90">
+                <p className="mt-1 leading-relaxed text-red-700 dark:text-red-200/90">
                   Neste preço você paga para trabalhar: o valor não cobre seus custos e impostos,
                   gerando prejuízo real de{' '}
                   <strong className="tabular-nums">
@@ -86,14 +95,14 @@ export const PricingAnalysisPanel: React.FC<PricingAnalysisPanelProps> = ({
         );
       case 'breakeven':
         return (
-          <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/30">
+          <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-4 dark:border-amber-800/70 dark:bg-amber-950/35">
             <div className="flex items-start gap-2.5">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-              <div className="text-xs">
+              <div className="text-[13px]">
                 <p className="font-bold text-amber-900 dark:text-amber-300">
                   Ponto de empate (lucro zero)
                 </p>
-                <p className="mt-0.5 leading-relaxed text-amber-800 dark:text-amber-300/90">
+                <p className="mt-1 leading-relaxed text-amber-800 dark:text-amber-200/90">
                   Seu preço cobre apenas custos operacionais e impostos, sem gerar reserva ou lucro
                   líquido. Reajuste em{' '}
                   <strong className="tabular-nums">
@@ -107,14 +116,14 @@ export const PricingAnalysisPanel: React.FC<PricingAnalysisPanelProps> = ({
         );
       case 'below_recommended':
         return (
-          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 dark:border-amber-900/60 dark:bg-amber-950/30">
+          <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 dark:border-amber-800/70 dark:bg-amber-950/35">
             <div className="flex items-start gap-2.5">
               <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-              <div className="text-xs">
+              <div className="text-[13px]">
                 <p className="font-bold text-amber-900 dark:text-amber-300">
                   Abaixo do recomendado (sem prejuízo, mas com margem reduzida)
                 </p>
-                <p className="mt-0.5 leading-relaxed text-amber-800 dark:text-amber-300/90">
+                <p className="mt-1 leading-relaxed text-amber-800 dark:text-amber-200/90">
                   Este valor não dá prejuízo, mas reduz sua margem real para{' '}
                   <strong className="tabular-nums">{formatPercent(diagnosis.margemRealAtual, 1)}</strong>{' '}
                   (contra {formatPercent(result.margemEfetiva, 1)} planejados), deixando{' '}
@@ -129,14 +138,14 @@ export const PricingAnalysisPanel: React.FC<PricingAnalysisPanelProps> = ({
         );
       case 'healthy':
         return (
-          <div className="rounded-xl border border-[#16A34A]/30 bg-[#F0FDF4]/80 p-3.5 dark:border-emerald-800/60 dark:bg-emerald-950/40">
+          <div className="rounded-xl border border-[#16A34A]/35 bg-[#F0FDF4]/85 p-4 dark:border-emerald-700/70 dark:bg-emerald-950/45">
             <div className="flex items-start gap-2.5">
               <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#16A34A] dark:text-emerald-400" />
-              <div className="text-xs">
+              <div className="text-[13px]">
                 <p className="font-bold text-[#14532D] dark:text-emerald-300">
                   Preço saudável e rentável
                 </p>
-                <p className="mt-0.5 leading-relaxed text-[#14532D]/90 dark:text-emerald-300/90">
+                <p className="mt-1 leading-relaxed text-[#14532D]/90 dark:text-emerald-100/90">
                   Seu preço atual atinge ou supera o recomendado, entregando rentabilidade líquida
                   real de{' '}
                   <strong className="tabular-nums">{formatPercent(diagnosis.margemRealAtual, 1)}</strong>.
@@ -153,7 +162,7 @@ export const PricingAnalysisPanel: React.FC<PricingAnalysisPanelProps> = ({
       {/* 1. Diagnóstico de precificação */}
       <section
         aria-label="Diagnóstico de precificação"
-        className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-800 dark:bg-[#111827]"
+        className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-700/80 dark:bg-[#111827]"
       >
         <div>
           <div className="flex items-center justify-between gap-2">
@@ -191,7 +200,7 @@ export const PricingAnalysisPanel: React.FC<PricingAnalysisPanelProps> = ({
                 placeholder={`Ex.: ${Math.round(result.precoRecomendado * 0.8)}`}
                 value={currentPriceStr}
                 onChange={(e) => setCurrentPriceStr(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm font-semibold text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="h-11 w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm font-semibold text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
               />
             </div>
             {currentPriceStr.trim() !== '' && (!Number.isFinite(parsedCurrentPrice) || parsedCurrentPrice <= 0) && (
@@ -281,7 +290,7 @@ export const PricingAnalysisPanel: React.FC<PricingAnalysisPanelProps> = ({
       {/* 2. Simulador de negociação */}
       <section
         aria-label="Simulador de negociação"
-        className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-800 dark:bg-[#111827]"
+        className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-700/80 dark:bg-[#111827]"
       >
         <div>
           <div className="flex items-center justify-between gap-2">
@@ -311,7 +320,7 @@ export const PricingAnalysisPanel: React.FC<PricingAnalysisPanelProps> = ({
               <span className="text-xs font-semibold text-gray-500 tabular-nums dark:text-slate-400">
                 Máximo sem prejuízo:{' '}
                 <strong className="text-[#14532D] dark:text-emerald-400">
-                  {formatPercent(maxSafeDiscountPercent, 1)}
+                  {formatPercent(safeLimitPresetPercent, 1)}
                 </strong>
               </span>
             </div>
@@ -336,25 +345,25 @@ export const PricingAnalysisPanel: React.FC<PricingAnalysisPanelProps> = ({
                   step="0.5"
                   value={discountStr}
                   onChange={(e) => setDiscountStr(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-3 pr-7 text-sm font-semibold text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  className="h-10 w-full rounded-xl border border-gray-200 bg-white py-2 pl-3 pr-7 text-sm font-semibold text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                 />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 dark:text-slate-400">
                   %
                 </span>
               </div>
             </div>
 
             {/* Quick discount presets */}
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
+            <div className="mt-3 flex flex-wrap gap-2">
               {[0, 5, 10, 15].map((pct) => (
                 <button
                   key={pct}
                   type="button"
                   onClick={() => setDiscountStr(String(pct))}
-                  className={`rounded-lg border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                  className={`min-h-[34px] rounded-lg border px-3 py-1 text-xs font-semibold transition-colors ${
                     Math.abs(parsedDiscount - pct) < 0.05
-                      ? 'border-[#16A34A] bg-[#F0FDF4] text-[#14532D] dark:border-emerald-500 dark:bg-emerald-950/60 dark:text-emerald-300'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
+                      ? 'border-[#16A34A] bg-[#F0FDF4] text-[#14532D] dark:border-emerald-500 dark:bg-emerald-950/70 dark:text-emerald-300'
+                      : 'border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:bg-[#1A2333]/60 dark:text-slate-200 dark:hover:bg-slate-800'
                   }`}
                 >
                   {pct === 0 ? 'Sem desconto' : `${pct}%`}
@@ -362,10 +371,10 @@ export const PricingAnalysisPanel: React.FC<PricingAnalysisPanelProps> = ({
               ))}
               <button
                 type="button"
-                onClick={() => setDiscountStr(maxSafeDiscountPercent.toFixed(1))}
-                className="rounded-lg border border-gray-200 px-2.5 py-1 text-[11px] font-semibold text-gray-700 transition-colors hover:border-[#16A34A]/50 hover:bg-[#F0FDF4] hover:text-[#14532D] dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                onClick={() => setDiscountStr(safeLimitPresetPercent.toFixed(1))}
+                className="min-h-[34px] rounded-lg border border-gray-200 px-3 py-1 text-xs font-semibold text-gray-700 transition-colors hover:border-[#16A34A]/50 hover:bg-[#F0FDF4] hover:text-[#14532D] dark:border-slate-700 dark:bg-[#1A2333]/60 dark:text-slate-200 dark:hover:bg-slate-800"
               >
-                Limite ({formatPercent(maxSafeDiscountPercent, 1)})
+                Limite ({formatPercent(safeLimitPresetPercent, 1)})
               </button>
             </div>
           </div>

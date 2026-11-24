@@ -1,6 +1,7 @@
 import {
   CalculationHistoryItem,
   FinancialProfile,
+  GoalSettings,
   MonthlyCost,
   ProfessionalSettings,
   ServiceItem,
@@ -10,12 +11,17 @@ import { calculatePricing } from '../utils/pricing';
 export const DEMO_PROFILE: FinancialProfile = {
   remuneracaoMensal: 5500,
   usarCustosMensaisAutomaticos: true,
-  custosFixosManuais: 1450,
+  custosFixosManuais: 1578.9,
   diasTrabalhadosMes: 20,
   horasProdutivasDia: 6,
   percentualFaturavel: 75,
   margemLucroPadrao: 25,
   impostosTaxasPadrao: 6,
+};
+
+export const DEMO_GOAL: GoalSettings = {
+  metaFaturamentoMensal: 10300,
+  mixQuantidades: {},
 };
 
 export const DEMO_PROFESSIONAL: ProfessionalSettings = {
@@ -182,6 +188,7 @@ const DEMO_SEEDS: DemoServiceSeed[] = [
 export function buildDemoBundle(): {
   profile: FinancialProfile;
   professional: ProfessionalSettings;
+  goal: GoalSettings;
   costs: MonthlyCost[];
   services: ServiceItem[];
   history: CalculationHistoryItem[];
@@ -235,6 +242,7 @@ export function buildDemoBundle(): {
   return {
     profile: { ...DEMO_PROFILE },
     professional: { ...DEMO_PROFESSIONAL },
+    goal: { ...DEMO_GOAL, mixQuantidades: {} },
     costs: DEMO_COSTS.map((c) => ({ ...c })),
     services,
     history: history.reverse(),

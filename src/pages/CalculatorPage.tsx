@@ -18,12 +18,11 @@ import { useApp } from '../context/AppContext';
 import { SERVICE_CATEGORIES, ServiceCategory, ServiceFormInput } from '../types';
 import {
   calculatePricing,
-  getEffectiveMonthlyCosts,
   validateFinancialProfileValues,
   validateServiceFormValues,
   ValidationErrors,
 } from '../utils/pricing';
-import { formatCurrencyBRL, formatHours, formatPercent } from '../utils/format';
+import { formatCurrencyBRL, formatHours, formatPercent, parseNumericInput } from '../utils/format';
 import { PricingAnalysisPanel } from '../components/PricingAnalysisPanel';
 
 const COMPOSITION_COLORS = {
@@ -34,9 +33,9 @@ const COMPOSITION_COLORS = {
 };
 
 const STEPS = [
-  { id: 1 as const, label: 'Perfil financeiro', subtitle: 'Sua meta mensal e capacidade' },
-  { id: 2 as const, label: 'Informações do serviço', subtitle: 'Tempo, custos e margem' },
-  { id: 3 as const, label: 'Resultado', subtitle: 'Preço recomendado e orçamento' },
+  { id: 1 as const, shortLabel: 'Perfil', label: 'Perfil financeiro', subtitle: 'Sua meta mensal e capacidade' },
+  { id: 2 as const, shortLabel: 'Serviço', label: 'Informações do serviço', subtitle: 'Tempo, custos e margem' },
+  { id: 3 as const, shortLabel: 'Resultado', label: 'Resultado', subtitle: 'Preço recomendado e orçamento' },
 ];
 
 export const CalculatorPage: React.FC = () => {
@@ -47,6 +46,7 @@ export const CalculatorPage: React.FC = () => {
     addHistoryItem,
     addService,
     notify,
+    clearToasts,
     setActivePage,
     openQuoteModal,
     calculatorPrefill,
@@ -118,6 +118,12 @@ export const CalculatorPage: React.FC = () => {
     if (calculatorPrefill.profileOverride) {
       const ov = calculatorPrefill.profileOverride;
       if (ov.remuneracaoMensal !== undefined) setRemuneracaoStr(String(ov.remuneracaoMensal));
+      if (ov.usarCustosMensaisAutomaticos !== undefined) {
+        setUsarCustosAutomaticos(ov.usarCustosMensaisAutomaticos);
+      }
+      if (ov.custosFixosManuais !== undefined) {
+        setCustosManuaisStr(ov.custosFixosManuais > 0 ? String(ov.custosFixosManuais) : '0');
+      }
       if (ov.diasTrabalhadosMes !== undefined) setDiasStr(String(ov.diasTrabalhadosMes));
       if (ov.horasProdutivasDia !== undefined) setHorasDiaStr(String(ov.horasProdutivasDia));
       if (ov.percentualFaturavel !== undefined) setFaturavelStr(String(ov.percentualFaturavel));
@@ -129,29 +135,17 @@ export const CalculatorPage: React.FC = () => {
     clearCalculatorPrefill();
   }, [calculatorPrefill, clearCalculatorPrefill]);
 
-  const toNum = (raw: string): number => {
-    if (raw.trim() === '') return 0;
-    const n = Number(raw.replace(',', '.'));
-    return Number.isFinite(n) ? n : NaN;
-  };
+  const remuneracaoMensal = parseNumericInput(remuneracaoStr, 0);
+  const rawCustosManuais = parseNumericInput(custosManuaisStr, 0);
+  const custosFixosMensais = usarCustosAutomaticos ? totalMonthlyCosts : rawCustosManuais;
+  const diasTrabalhadosMes = parseNumericInput(diasStr, 0);
+  const horasProdutivasDia = parseNumericInput(horasDiaStr, 0);
+  const percentualFaturavel = parseNumericInput(faturavelStr, 0);
 
-  const remuneracaoMensal = toNum(remuneracaoStr);
-  const custosFixosMensais = getEffectiveMonthlyCosts(
-    {
-      ...state.profile,
-      usarCustosMensaisAutomaticos: usarCustosAutomaticos,
-      custosFixosManuais: toNum(custosManuaisStr),
-    },
-    totalMonthlyCosts
-  );
-  const diasTrabalhadosMes = toNum(diasStr);
-  const horasProdutivasDia = toNum(horasDiaStr);
-  const percentualFaturavel = toNum(faturavelStr);
-
-  const horasNecessarias = toNum(horasNecessariasStr);
-  const custosAdicionais = toNum(custosAdicionaisStr);
-  const margemLucro = toNum(margemStr);
-  const impostosTaxas = toNum(impostosStr);
+  const horasNecessarias = parseNumericInput(horasNecessariasStr, 0);
+  const custosAdicionais = parseNumericInput(custosAdicionaisStr, 0);
+  const margemLucro = parseNumericInput(margemStr, 0);
+  const impostosTaxas = parseNumericInput(impostosStr, 0);
 
   const step1Preview = useMemo(() => {
     const errs = validateFinancialProfileValues({
@@ -200,9 +194,9 @@ export const CalculatorPage: React.FC = () => {
 
   const persistProfile = () => {
     updateProfile({
-      remuneracaoMensal: Number.isFinite(remuneracaoMensal) ? remuneracaoMensal : 0,
+      remuneracaoMensal: Number.isFinite(remuneracaoMensal) && remuneracaoMensal >= 0 ? remuneracaoMensal : 0,
       usarCustosMensaisAutomaticos: usarCustosAutomaticos,
-      custosFixosManuais: Number.isFinite(toNum(custosManuaisStr)) ? toNum(custosManuaisStr) : 0,
+      custosFixosManuais: Number.isFinite(rawCustosManuais) && rawCustosManuais >= 0 ? rawCustosManuais : 0,
       diasTrabalhadosMes: Number.isFinite(diasTrabalhadosMes) ? diasTrabalhadosMes : 20,
       horasProdutivasDia: Number.isFinite(horasProdutivasDia) ? horasProdutivasDia : 6,
       percentualFaturavel: Number.isFinite(percentualFaturavel) ? percentualFaturavel : 70,
@@ -229,6 +223,7 @@ export const CalculatorPage: React.FC = () => {
     }
 
     setErrors({});
+    clearToasts();
     persistProfile();
     setStep(2);
   };
@@ -266,11 +261,8 @@ export const CalculatorPage: React.FC = () => {
     }
 
     setErrors({});
+    clearToasts();
     persistProfile();
-    updateProfile({
-      margemLucroPadrao: margemLucro,
-      impostosTaxasPadrao: impostosTaxas,
-    });
     setSavedHistoryId(null);
     setSavedAsService(false);
     setStep(3);
@@ -410,6 +402,7 @@ export const CalculatorPage: React.FC = () => {
     setMargemStr(String(state.profile.margemLucroPadrao));
     setImpostosStr(String(state.profile.impostosTaxasPadrao));
     setErrors({});
+    clearToasts();
     setSavedHistoryId(null);
     setSavedAsService(false);
     setStep(1);
@@ -418,13 +411,14 @@ export const CalculatorPage: React.FC = () => {
   const compositionData = useMemo(() => {
     if (!calculationOutcome.ok) return [];
     const r = calculationOutcome.data;
+    const laborColor = state.theme === 'dark' ? '#64748B' : COMPOSITION_COLORS.labor;
     return [
-      { name: 'Mão de obra', value: Number(r.custoMaoDeObra.toFixed(2)), color: COMPOSITION_COLORS.labor },
+      { name: 'Mão de obra', value: Number(r.custoMaoDeObra.toFixed(2)), color: laborColor },
       { name: 'Custos adicionais', value: Number(r.custoServico - r.custoMaoDeObra > 0 ? (r.custoServico - r.custoMaoDeObra).toFixed(2) : 0), color: COMPOSITION_COLORS.additional },
       { name: 'Impostos e taxas', value: Number(r.valorImpostosTaxas.toFixed(2)), color: COMPOSITION_COLORS.taxes },
       { name: 'Lucro líquido', value: Number(r.lucroLiquidoEstimado.toFixed(2)), color: COMPOSITION_COLORS.profit },
     ].filter((d) => d.value > 0);
-  }, [calculationOutcome]);
+  }, [calculationOutcome, state.theme]);
 
   const combinedPercent =
     (Number.isFinite(margemLucro) ? margemLucro : 0) +
@@ -456,8 +450,8 @@ export const CalculatorPage: React.FC = () => {
       </div>
 
       {/* Stepper */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-4 dark:border-slate-800 dark:bg-[#111827]">
-        <ol className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="rounded-2xl border border-gray-200 bg-white p-2.5 sm:p-3.5 dark:border-slate-700/80 dark:bg-[#111827]">
+        <ol className="grid grid-cols-3 gap-2 sm:gap-3">
           {STEPS.map((s) => {
             const isCurrent = step === s.id;
             const isCompleted = step > s.id;
@@ -466,36 +460,40 @@ export const CalculatorPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleStepClick(s.id)}
-                  className={`flex w-full items-center gap-3 rounded-xl border px-3.5 py-3 text-left transition-colors ${
+                  aria-current={isCurrent ? 'step' : undefined}
+                  className={`flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border px-1.5 py-2 text-left transition-colors sm:justify-start sm:gap-3 sm:px-3.5 sm:py-2.5 ${
                     isCurrent
-                      ? 'border-[#16A34A] bg-[#F0FDF4]/80 dark:border-emerald-500 dark:bg-emerald-950/40'
+                      ? 'border-[#16A34A] bg-[#F0FDF4]/85 dark:border-emerald-500 dark:bg-emerald-950/50'
                       : isCompleted
-                      ? 'border-gray-200 bg-gray-50/70 hover:border-gray-300 dark:border-slate-700 dark:bg-slate-800/40'
+                      ? 'border-gray-200 bg-gray-50/80 hover:border-gray-300 dark:border-slate-700 dark:bg-[#1A2333]/80 dark:hover:border-slate-600'
                       : 'border-gray-100 hover:border-gray-200 dark:border-slate-800 dark:hover:border-slate-700'
                   }`}
                 >
                   <span
-                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs font-bold sm:h-7 sm:w-7 ${
                       isCurrent
                         ? 'bg-[#16A34A] text-white'
                         : isCompleted
                         ? 'bg-[#14532D] text-white dark:bg-emerald-600'
-                        : 'bg-[#F3F4F6] text-gray-500 dark:bg-slate-800 dark:text-slate-400'
+                        : 'bg-[#F3F4F6] text-gray-600 dark:bg-[#1A2333] dark:text-slate-300'
                     }`}
                   >
-                    {isCompleted ? <Check className="h-4 w-4" /> : s.id}
+                    {isCompleted ? <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : s.id}
                   </span>
                   <div className="min-w-0">
                     <p
-                      className={`truncate text-sm font-semibold ${
+                      className={`truncate text-xs font-semibold sm:text-sm ${
                         isCurrent
                           ? 'text-[#14532D] dark:text-emerald-300'
                           : 'text-[#111827] dark:text-white'
                       }`}
                     >
-                      Etapa {s.id} — {s.label}
+                      <span className="sm:hidden">{s.shortLabel}</span>
+                      <span className="hidden sm:inline">
+                        Etapa {s.id} — {s.label}
+                      </span>
                     </p>
-                    <p className="truncate text-xs text-gray-500 dark:text-slate-400">
+                    <p className="hidden truncate text-xs text-gray-600 dark:text-slate-400 sm:block">
                       {s.subtitle}
                     </p>
                   </div>
@@ -509,7 +507,7 @@ export const CalculatorPage: React.FC = () => {
       {/* STEP 1: Financial Profile */}
       {step === 1 && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-800 dark:bg-[#111827] lg:col-span-8">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-700/80 dark:bg-[#111827] lg:col-span-8">
             <h2 className="text-base font-bold text-[#111827] dark:text-white">
               Etapa 1 — Perfil financeiro
             </h2>
@@ -538,7 +536,7 @@ export const CalculatorPage: React.FC = () => {
                     placeholder="5000"
                     value={remuneracaoStr}
                     onChange={(e) => setRemuneracaoStr(e.target.value)}
-                    className={`w-full rounded-xl border bg-white py-2.5 pl-10 pr-3.5 text-sm font-medium text-[#111827] outline-none transition-colors tabular-nums focus:border-[#16A34A] dark:bg-slate-900 dark:text-white ${
+                    className={`w-full rounded-xl border bg-white py-2.5 pl-10 pr-3.5 text-sm font-medium text-[#111827] outline-none transition-colors tabular-nums focus:border-[#16A34A] dark:bg-[#1A2333] dark:text-white ${
                       errors.remuneracaoMensal
                         ? 'border-red-400 dark:border-red-500'
                         : 'border-gray-200 dark:border-slate-700'
@@ -598,7 +596,7 @@ export const CalculatorPage: React.FC = () => {
                       placeholder="1200"
                       value={custosManuaisStr}
                       onChange={(e) => setCustosManuaisStr(e.target.value)}
-                      className={`w-full rounded-xl border bg-white py-2.5 pl-10 pr-3.5 text-sm font-medium text-[#111827] outline-none transition-colors tabular-nums focus:border-[#16A34A] dark:bg-slate-900 dark:text-white ${
+                      className={`w-full rounded-xl border bg-white py-2.5 pl-10 pr-3.5 text-sm font-medium text-[#111827] outline-none transition-colors tabular-nums focus:border-[#16A34A] dark:bg-[#1A2333] dark:text-white ${
                         errors.custosFixosMensais
                           ? 'border-red-400 dark:border-red-500'
                           : 'border-gray-200 dark:border-slate-700'
@@ -641,7 +639,7 @@ export const CalculatorPage: React.FC = () => {
                   step="1"
                   value={diasStr}
                   onChange={(e) => setDiasStr(e.target.value)}
-                  className={`mt-1.5 w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm font-medium text-[#111827] outline-none transition-colors tabular-nums focus:border-[#16A34A] dark:bg-slate-900 dark:text-white ${
+                  className={`mt-1.5 w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm font-medium text-[#111827] outline-none transition-colors tabular-nums focus:border-[#16A34A] dark:bg-[#1A2333] dark:text-white ${
                     errors.diasTrabalhadosMes
                       ? 'border-red-400 dark:border-red-500'
                       : 'border-gray-200 dark:border-slate-700'
@@ -674,7 +672,7 @@ export const CalculatorPage: React.FC = () => {
                   step="0.5"
                   value={horasDiaStr}
                   onChange={(e) => setHorasDiaStr(e.target.value)}
-                  className={`mt-1.5 w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm font-medium text-[#111827] outline-none transition-colors tabular-nums focus:border-[#16A34A] dark:bg-slate-900 dark:text-white ${
+                  className={`mt-1.5 w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm font-medium text-[#111827] outline-none transition-colors tabular-nums focus:border-[#16A34A] dark:bg-[#1A2333] dark:text-white ${
                     errors.horasProdutivasDia
                       ? 'border-red-400 dark:border-red-500'
                       : 'border-gray-200 dark:border-slate-700'
@@ -728,7 +726,7 @@ export const CalculatorPage: React.FC = () => {
                       step="1"
                       value={faturavelStr}
                       onChange={(e) => setFaturavelStr(e.target.value)}
-                      className={`w-full rounded-xl border bg-white py-2 pl-3 pr-7 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:bg-slate-900 dark:text-white ${
+                      className={`w-full rounded-xl border bg-white py-2 pl-3 pr-7 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:bg-[#1A2333] dark:text-white ${
                         errors.percentualFaturavel
                           ? 'border-red-400 dark:border-red-500'
                           : 'border-gray-200 dark:border-slate-700'
@@ -765,7 +763,7 @@ export const CalculatorPage: React.FC = () => {
           </div>
 
           {/* Live preview sidebar */}
-          <aside className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-800 dark:bg-[#111827] lg:col-span-4">
+          <aside className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-700/80 dark:bg-[#111827] lg:col-span-4">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">
               <Sliders className="h-4 w-4 text-[#16A34A]" />
               Resumo do perfil
@@ -825,7 +823,7 @@ export const CalculatorPage: React.FC = () => {
       {/* STEP 2: Service Information */}
       {step === 2 && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-800 dark:bg-[#111827] lg:col-span-8">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-700/80 dark:bg-[#111827] lg:col-span-8">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-base font-bold text-[#111827] dark:text-white">
@@ -844,7 +842,7 @@ export const CalculatorPage: React.FC = () => {
                   </label>
                   <select
                     id="prefill-service"
-                    defaultValue=""
+                    value=""
                     onChange={(e) => handleSelectExistingService(e.target.value)}
                     className="w-full rounded-xl border border-gray-200 bg-[#F3F4F6]/60 px-3 py-2 text-xs font-medium text-gray-700 outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                   >
@@ -875,7 +873,7 @@ export const CalculatorPage: React.FC = () => {
                     placeholder="Ex.: Criação de identidade visual"
                     value={serviceName}
                     onChange={(e) => setServiceName(e.target.value)}
-                    className={`mt-1.5 w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none transition-colors focus:border-[#16A34A] dark:bg-slate-900 dark:text-white ${
+                    className={`mt-1.5 w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none transition-colors focus:border-[#16A34A] dark:bg-[#1A2333] dark:text-white ${
                       errors.nome
                         ? 'border-red-400 dark:border-red-500'
                         : 'border-gray-200 dark:border-slate-700'
@@ -897,7 +895,7 @@ export const CalculatorPage: React.FC = () => {
                     id="calc-service-category"
                     value={categoria}
                     onChange={(e) => setCategoria(e.target.value as ServiceCategory)}
-                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-[#1A2333] dark:text-white"
                   >
                     {SERVICE_CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
@@ -922,7 +920,7 @@ export const CalculatorPage: React.FC = () => {
                   placeholder="Descreva brevemente entregas, etapas ou inclusões deste serviço..."
                   value={descricao}
                   onChange={(e) => setDescricao(e.target.value)}
-                  className="mt-1.5 w-full resize-none rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  className="mt-1.5 w-full resize-none rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-[#1A2333] dark:text-white"
                 />
               </div>
 
@@ -942,7 +940,7 @@ export const CalculatorPage: React.FC = () => {
                   placeholder="Ex.: 12"
                   value={horasNecessariasStr}
                   onChange={(e) => setHorasNecessariasStr(e.target.value)}
-                  className={`mt-1.5 w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:bg-slate-900 dark:text-white ${
+                  className={`mt-1.5 w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:bg-[#1A2333] dark:text-white ${
                     errors.horasNecessarias
                       ? 'border-red-400 dark:border-red-500'
                       : 'border-gray-200 dark:border-slate-700'
@@ -979,7 +977,7 @@ export const CalculatorPage: React.FC = () => {
                     placeholder="0"
                     value={custosAdicionaisStr}
                     onChange={(e) => setCustosAdicionaisStr(e.target.value)}
-                    className={`w-full rounded-xl border bg-white py-2.5 pl-10 pr-3.5 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:bg-slate-900 dark:text-white ${
+                    className={`w-full rounded-xl border bg-white py-2.5 pl-10 pr-3.5 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:bg-[#1A2333] dark:text-white ${
                       errors.custosAdicionais
                         ? 'border-red-400 dark:border-red-500'
                         : 'border-gray-200 dark:border-slate-700'
@@ -1014,7 +1012,7 @@ export const CalculatorPage: React.FC = () => {
                     step="1"
                     value={margemStr}
                     onChange={(e) => setMargemStr(e.target.value)}
-                    className={`w-full rounded-xl border bg-white py-2.5 pl-3.5 pr-8 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:bg-slate-900 dark:text-white ${
+                    className={`w-full rounded-xl border bg-white py-2.5 pl-3.5 pr-8 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:bg-[#1A2333] dark:text-white ${
                       errors.margemLucro
                         ? 'border-red-400 dark:border-red-500'
                         : 'border-gray-200 dark:border-slate-700'
@@ -1048,7 +1046,7 @@ export const CalculatorPage: React.FC = () => {
                     step="0.5"
                     value={impostosStr}
                     onChange={(e) => setImpostosStr(e.target.value)}
-                    className={`w-full rounded-xl border bg-white py-2.5 pl-3.5 pr-8 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:bg-slate-900 dark:text-white ${
+                    className={`w-full rounded-xl border bg-white py-2.5 pl-3.5 pr-8 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:bg-[#1A2333] dark:text-white ${
                       errors.impostosTaxas
                         ? 'border-red-400 dark:border-red-500'
                         : 'border-gray-200 dark:border-slate-700'
@@ -1102,7 +1100,7 @@ export const CalculatorPage: React.FC = () => {
           </div>
 
           {/* Step 2 live estimation sidebar */}
-          <aside className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-800 dark:bg-[#111827] lg:col-span-4">
+          <aside className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-700/80 dark:bg-[#111827] lg:col-span-4">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">
               Prévia em tempo real
             </h3>
@@ -1253,80 +1251,84 @@ export const CalculatorPage: React.FC = () => {
               </div>
 
               {/* Action buttons */}
-              <div className="mt-6 flex flex-wrap items-center gap-2.5 border-t border-gray-100 pt-5 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={handleSaveCalculation}
-                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-                    savedHistoryId
-                      ? 'border border-[#16A34A]/30 bg-[#F0FDF4] text-[#14532D] dark:border-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
-                      : 'bg-[#16A34A] text-white hover:bg-[#15803D]'
-                  }`}
-                >
-                  {savedHistoryId ? (
-                    <>
-                      <CheckCircle2 className="h-4 w-4" />
-                      Cálculo salvo
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4" />
-                      Salvar cálculo
-                    </>
-                  )}
-                </button>
+              <div className="mt-6 space-y-3 border-t border-gray-100 pt-5 dark:border-slate-800">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleSaveCalculation}
+                    className={`inline-flex min-h-[42px] items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                      savedHistoryId
+                        ? 'border border-[#16A34A]/40 bg-[#F0FDF4] text-[#14532D] dark:border-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                        : 'bg-[#16A34A] text-white hover:bg-[#15803D]'
+                    }`}
+                  >
+                    {savedHistoryId ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4" />
+                        Cálculo salvo
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4" />
+                        Salvar cálculo
+                      </>
+                    )}
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={handleCopyQuote}
-                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-[#111827] transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
-                >
-                  <Copy className="h-4 w-4 text-gray-500 dark:text-slate-400" />
-                  Copiar orçamento
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleOpenPdfModal}
+                    className="inline-flex min-h-[42px] items-center gap-2 rounded-xl bg-[#111827] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 dark:bg-white dark:text-[#111827] dark:hover:bg-gray-200"
+                  >
+                    <FileDown className="h-4 w-4" />
+                    Gerar orçamento em PDF
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={handleOpenPdfModal}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#111827] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-gray-800 dark:bg-white dark:text-[#111827] dark:hover:bg-gray-200"
-                >
-                  <FileDown className="h-4 w-4" />
-                  Gerar orçamento em PDF
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleCopyQuote}
+                    className="inline-flex min-h-[42px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-[#111827] transition-colors hover:bg-gray-50 dark:border-slate-600 dark:bg-[#1A2333] dark:text-white dark:hover:bg-slate-800"
+                  >
+                    <Copy className="h-4 w-4 text-gray-500 dark:text-slate-300" />
+                    Copiar orçamento
+                  </button>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={handleSaveToCatalog}
-                  disabled={savedAsService}
-                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                >
-                  <BookmarkPlus className="h-4 w-4 text-[#16A34A]" />
-                  {savedAsService ? 'Salvo em Meus serviços' : 'Salvar em Meus serviços'}
-                </button>
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                  <button
+                    type="button"
+                    onClick={handleSaveToCatalog}
+                    disabled={savedAsService}
+                    className="inline-flex min-h-[38px] items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-[#1A2333] dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    <BookmarkPlus className="h-4 w-4 text-[#16A34A]" />
+                    {savedAsService ? 'Salvo em Meus serviços' : 'Salvar em Meus serviços'}
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={handleResetCalculation}
-                  className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-100 hover:text-[#111827] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Realizar novo cálculo
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleResetCalculation}
+                    className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-100 hover:text-[#111827] dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    Realizar novo cálculo
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Price composition chart */}
-            <div className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-800 dark:bg-[#111827] lg:col-span-5">
+            <div className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-700/80 dark:bg-[#111827] lg:col-span-5">
               <div>
                 <h3 className="text-base font-bold text-[#111827] dark:text-white">
                   Composição do preço
                 </h3>
-                <p className="mt-0.5 text-xs text-gray-500 dark:text-slate-400">
+                <p className="mt-0.5 text-xs text-gray-600 dark:text-slate-400">
                   Como o valor recomendado se divide entre custos, impostos e lucro líquido
                 </p>
 
                 <div className="mt-4 h-60 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ResponsiveContainer width="100%" height="100%" minHeight={240}>
                     <PieChart>
                       <Pie
                         data={compositionData}
@@ -1338,6 +1340,7 @@ export const CalculatorPage: React.FC = () => {
                         outerRadius={90}
                         paddingAngle={2}
                         stroke="none"
+                        isAnimationActive={false}
                       >
                         {compositionData.map((entry) => (
                           <Cell key={entry.name} fill={entry.color} />
@@ -1348,10 +1351,16 @@ export const CalculatorPage: React.FC = () => {
                         formatter={(val: number) => [formatCurrencyBRL(val), 'Parcela']}
                         contentStyle={{
                           borderRadius: '10px',
-                          border: '1px solid #E5E7EB',
+                          border: state.theme === 'dark' ? '1px solid #334155' : '1px solid #E5E7EB',
                           fontSize: '12px',
-                          backgroundColor: state.theme === 'dark' ? '#111827' : '#FFFFFF',
+                          backgroundColor: state.theme === 'dark' ? '#1A2333' : '#FFFFFF',
                           color: state.theme === 'dark' ? '#F9FAFB' : '#111827',
+                        }}
+                        itemStyle={{
+                          color: state.theme === 'dark' ? '#F9FAFB' : '#111827',
+                        }}
+                        labelStyle={{
+                          color: state.theme === 'dark' ? '#CBD5E1' : '#4B5563',
                         }}
                       />
                     </PieChart>

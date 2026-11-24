@@ -26,13 +26,13 @@ export const ToastContainer: React.FC = () => {
           <div
             key={toast.id}
             role="status"
-            className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-lg dark:border-slate-700 dark:bg-[#111827]"
+            className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-md dark:border-slate-700 dark:bg-[#1A2333]"
           >
             {icon}
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-[#111827] dark:text-white">{toast.title}</p>
               {toast.description && (
-                <p className="mt-0.5 text-xs leading-relaxed text-gray-600 dark:text-slate-400">
+                <p className="mt-0.5 text-xs leading-relaxed text-gray-600 dark:text-slate-300">
                   {toast.description}
                 </p>
               )}
@@ -41,7 +41,8 @@ export const ToastContainer: React.FC = () => {
               type="button"
               onClick={() => dismissToast(toast.id)}
               aria-label="Fechar notificação"
-              className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              title="Fechar notificação"
+              className="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>

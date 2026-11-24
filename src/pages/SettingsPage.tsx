@@ -12,6 +12,9 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { AppState } from '../types';
+import { BackupPreviewSummary } from '../utils/backup';
+import { formatDateTimeBR, parseNumericInput } from '../utils/format';
 
 export const SettingsPage: React.FC = () => {
   const {
@@ -24,7 +27,8 @@ export const SettingsPage: React.FC = () => {
     clearDemoData,
     resetAllData,
     createBackupJson,
-    importBackup,
+    previewBackup,
+    applyBackupState,
     openOnboarding,
     notify,
   } = useApp();
@@ -44,6 +48,10 @@ export const SettingsPage: React.FC = () => {
   const [impostosPadrao, setImpostosPadrao] = useState(String(state.profile.impostosTaxasPadrao));
 
   const [confirmReset, setConfirmReset] = useState(false);
+  const [pendingBackup, setPendingBackup] = useState<{
+    state: AppState;
+    summary: BackupPreviewSummary;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -61,9 +69,9 @@ export const SettingsPage: React.FC = () => {
 
   const handleSaveProfessional = (e: React.FormEvent) => {
     e.preventDefault();
-    const validade = Number(validadeDias);
-    const margem = Number(margemPadrao.replace(',', '.'));
-    const impostos = Number(impostosPadrao.replace(',', '.'));
+    const validade = parseNumericInput(validadeDias, NaN);
+    const margem = parseNumericInput(margemPadrao, NaN);
+    const impostos = parseNumericInput(impostosPadrao, NaN);
 
     if (!Number.isFinite(validade) || validade <= 0) {
       notify({
@@ -133,8 +141,24 @@ export const SettingsPage: React.FC = () => {
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
-        importBackup(reader.result);
+        const result = previewBackup(reader.result);
+        if (!result.ok) {
+          notify({
+            type: 'error',
+            title: 'Backup inválido',
+            description: result.error,
+          });
+          return;
+        }
+        setPendingBackup({ state: result.state, summary: result.summary });
       }
+    };
+    reader.onerror = () => {
+      notify({
+        type: 'error',
+        title: 'Erro ao ler arquivo',
+        description: 'Não foi possível ler o arquivo JSON selecionado.',
+      });
     };
     reader.readAsText(file);
     e.target.value = '';
@@ -179,7 +203,7 @@ export const SettingsPage: React.FC = () => {
                 placeholder="Ex.: Clara Mendes Design"
                 value={nomeProfissional}
                 onChange={(e) => setNomeProfissional(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
               />
             </div>
 
@@ -196,7 +220,7 @@ export const SettingsPage: React.FC = () => {
                 placeholder="Ex.: Designer Gráfico e Web"
                 value={especialidade}
                 onChange={(e) => setEspecialidade(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
               />
             </div>
 
@@ -213,7 +237,7 @@ export const SettingsPage: React.FC = () => {
                 placeholder="Ex.: CNPJ 00.000.000/0001-00"
                 value={documento}
                 onChange={(e) => setDocumento(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
               />
             </div>
 
@@ -230,7 +254,7 @@ export const SettingsPage: React.FC = () => {
                 placeholder="contato@seusite.com.br"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
               />
             </div>
 
@@ -247,7 +271,7 @@ export const SettingsPage: React.FC = () => {
                 placeholder="(11) 99999-9999"
                 value={telefone}
                 onChange={(e) => setTelefone(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
               />
             </div>
 
@@ -264,7 +288,7 @@ export const SettingsPage: React.FC = () => {
                 placeholder="São Paulo — SP"
                 value={cidade}
                 onChange={(e) => setCidade(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
               />
             </div>
 
@@ -282,7 +306,7 @@ export const SettingsPage: React.FC = () => {
                 max="180"
                 value={validadeDias}
                 onChange={(e) => setValidadeDias(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
               />
             </div>
 
@@ -322,7 +346,7 @@ export const SettingsPage: React.FC = () => {
                     step="1"
                     value={margemPadrao}
                     onChange={(e) => setMargemPadrao(e.target.value)}
-                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                   />
                 </div>
                 <div>
@@ -340,7 +364,7 @@ export const SettingsPage: React.FC = () => {
                     step="0.5"
                     value={impostosPadrao}
                     onChange={(e) => setImpostosPadrao(e.target.value)}
-                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                   />
                 </div>
               </div>
@@ -361,7 +385,7 @@ export const SettingsPage: React.FC = () => {
         {/* Right column: Theme, Demo Data, Backup */}
         <div className="space-y-6 lg:col-span-5">
           {/* Theme */}
-          <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-800 dark:bg-[#111827]">
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-700/80 dark:bg-[#111827]">
             <h2 className="text-base font-bold text-[#111827] dark:text-white">Aparência</h2>
             <p className="mt-0.5 text-xs text-gray-500 dark:text-slate-400">
               Escolha o modo visual que melhor se adapta ao seu ambiente de trabalho.
@@ -395,7 +419,7 @@ export const SettingsPage: React.FC = () => {
           </section>
 
           {/* Demo Data */}
-          <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-800 dark:bg-[#111827]">
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-700/80 dark:bg-[#111827]">
             <h2 className="text-base font-bold text-[#111827] dark:text-white">
               Dados demonstrativos
             </h2>
@@ -427,7 +451,7 @@ export const SettingsPage: React.FC = () => {
           </section>
 
           {/* Backup & Reset */}
-          <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-800 dark:bg-[#111827]">
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-700/80 dark:bg-[#111827]">
             <h2 className="text-base font-bold text-[#111827] dark:text-white">
               Armazenamento local e backup
             </h2>
@@ -487,6 +511,25 @@ export const SettingsPage: React.FC = () => {
           </section>
         </div>
       </div>
+
+      <ConfirmModal
+        open={Boolean(pendingBackup)}
+        title="Restaurar backup JSON?"
+        description={
+          pendingBackup
+            ? `Este backup contém ${pendingBackup.summary.costsCount} despesas, ${pendingBackup.summary.servicesCount} serviços e ${pendingBackup.summary.historyCount} cálculos${pendingBackup.summary.exportedAt ? ` (exportado em ${formatDateTimeBR(pendingBackup.summary.exportedAt)})` : ''}. Os dados atuais deste navegador serão substituídos.`
+            : ''
+        }
+        confirmLabel="Sim, restaurar backup"
+        danger={false}
+        onCancel={() => setPendingBackup(null)}
+        onConfirm={() => {
+          if (pendingBackup) {
+            applyBackupState(pendingBackup.state);
+            setPendingBackup(null);
+          }
+        }}
+      />
 
       <ConfirmModal
         open={confirmReset}

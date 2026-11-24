@@ -1,5 +1,10 @@
 import { AppState, SmartRecommendation } from '../types';
-import { calculatePricing, calculateProfileSummary, getEffectiveMonthlyCosts } from './pricing';
+import {
+  calculatePricing,
+  calculateProfileSummary,
+  floorToDecimals,
+  getEffectiveMonthlyCosts,
+} from './pricing';
 import { formatCurrencyBRL, formatPercent } from './format';
 
 /**
@@ -126,30 +131,36 @@ export function generateSmartRecommendations(
   }
 
   // 5. Concentração ou peso elevado dos custos fixos
-  if (state.costs.length > 0 && state.profile.remuneracaoMensal > 0) {
-    const totalEstrutura = state.profile.remuneracaoMensal + totalMonthlyCosts;
-    const pesoCustos = (totalMonthlyCosts / totalEstrutura) * 100;
+  if (custosFixosEfetivos > 0 && state.profile.remuneracaoMensal > 0) {
+    const totalEstrutura = state.profile.remuneracaoMensal + custosFixosEfetivos;
+    const pesoCustos = (custosFixosEfetivos / totalEstrutura) * 100;
 
     if (pesoCustos >= 35) {
-      const byCategory = new Map<string, number>();
-      for (const c of state.costs) {
-        byCategory.set(c.categoria, (byCategory.get(c.categoria) ?? 0) + c.valor);
-      }
-      let topCat = '';
-      let topVal = 0;
-      for (const [cat, val] of byCategory.entries()) {
-        if (val > topVal) {
-          topVal = val;
-          topCat = cat;
+      let topDetail = '';
+      if (state.profile.usarCustosMensaisAutomaticos && state.costs.length > 0) {
+        const byCategory = new Map<string, number>();
+        for (const c of state.costs) {
+          byCategory.set(c.categoria, (byCategory.get(c.categoria) ?? 0) + c.valor);
+        }
+        let topCat = '';
+        let topVal = 0;
+        for (const [cat, val] of byCategory.entries()) {
+          if (val > topVal) {
+            topVal = val;
+            topCat = cat;
+          }
+        }
+        const shareTop = totalMonthlyCosts > 0 ? (topVal / totalMonthlyCosts) * 100 : 0;
+        if (topCat) {
+          topDetail = ` A maior categoria é ${topCat} (${formatPercent(shareTop, 0)} das despesas).`;
         }
       }
-      const shareTop = totalMonthlyCosts > 0 ? (topVal / totalMonthlyCosts) * 100 : 0;
       recommendations.push({
         id: 'rec-heavy-fixed-costs',
         severity: 'warning',
         title: 'Custos fixos representam parcela alta da operação',
-        description: `Seus custos fixos correspondem a ${formatPercent(pesoCustos, 1)} da necessidade mensal. A maior categoria é ${topCat} (${formatPercent(shareTop, 0)} das despesas).`,
-        metricLabel: formatCurrencyBRL(totalMonthlyCosts),
+        description: `Seus custos fixos correspondem a ${formatPercent(pesoCustos, 1)} da necessidade mensal.${topDetail}`,
+        metricLabel: formatCurrencyBRL(custosFixosEfetivos),
         actionLabel: 'Analisar custos',
         actionPage: 'costs',
       });
@@ -214,21 +225,24 @@ export function generateSmartRecommendations(
   if (
     profileSummary &&
     profileSummary.custoHora > 0 &&
-    state.costs.length > 0 &&
+    (custosFixosEfetivos > 0 || state.costs.length > 0) &&
     recommendations.filter((r) => r.severity === 'critical' || r.severity === 'warning').length === 0
   ) {
     const denom = 1 - state.profile.margemLucroPadrao / 100 - state.profile.impostosTaxasPadrao / 100;
     const horaRecomendada = denom > 0 ? profileSummary.custoHora / denom : profileSummary.custoHora;
     const maxSafeDiscount =
       1 - state.profile.impostosTaxasPadrao / 100 > 0
-        ? (state.profile.margemLucroPadrao / (100 - state.profile.impostosTaxasPadrao)) * 100
+        ? floorToDecimals(
+            (state.profile.margemLucroPadrao / (100 - state.profile.impostosTaxasPadrao)) * 100,
+            1
+          )
         : 0;
 
     recommendations.unshift({
       id: 'rec-healthy-structure',
       severity: 'healthy',
       title: 'Estrutura de precificação equilibrada',
-      description: `Sua hora recomendada (${formatCurrencyBRL(horaRecomendada)}/h) cobre seus custos fixos (${formatCurrencyBRL(totalMonthlyCosts)}) e pró-labore, oferecendo margem de segurança de até ${formatPercent(maxSafeDiscount, 1)} para negociações sem prejuízo.`,
+      description: `Sua hora recomendada (${formatCurrencyBRL(horaRecomendada)}/h) cobre seus custos fixos (${formatCurrencyBRL(custosFixosEfetivos)}) e pró-labore, oferecendo margem de segurança de até ${formatPercent(maxSafeDiscount, 1)} para negociações sem prejuízo.`,
       metricLabel: 'Operação saudável',
       actionLabel: 'Planejar metas',
       actionPage: 'goals',

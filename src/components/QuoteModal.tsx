@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { X, Printer, Copy, Scale, ShieldCheck } from 'lucide-react';
+import { X, Printer, Copy, ShieldCheck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { BrandLogo } from './BrandLogo';
 import {
   addDaysISO,
   formatCurrencyBRL,
   formatDateBR,
   generateQuoteNumber,
+  parseNumericInput,
   todayISO,
 } from '../utils/format';
 
@@ -53,7 +55,7 @@ export const QuoteModal: React.FC = () => {
 
   if (!quoteModalDraft) return null;
 
-  const parsedValor = Number(valorFinalStr.replace(',', '.'));
+  const parsedValor = parseNumericInput(valorFinalStr, 0);
   const safeValor = Number.isFinite(parsedValor) && parsedValor >= 0 ? parsedValor : 0;
 
   const handlePrintPdf = () => {
@@ -152,7 +154,7 @@ export const QuoteModal: React.FC = () => {
                 placeholder="Seu nome ou nome do estúdio"
                 value={nomeProfissional}
                 onChange={(e) => setNomeProfissional(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
               />
             </div>
 
@@ -170,7 +172,7 @@ export const QuoteModal: React.FC = () => {
                   placeholder="Ex.: Mariana Silva"
                   value={nomeCliente}
                   onChange={(e) => setNomeCliente(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                 />
               </div>
 
@@ -187,7 +189,7 @@ export const QuoteModal: React.FC = () => {
                   placeholder="Ex.: Horizonte Ltda."
                   value={empresaCliente}
                   onChange={(e) => setEmpresaCliente(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                 />
               </div>
             </div>
@@ -204,7 +206,7 @@ export const QuoteModal: React.FC = () => {
                 type="text"
                 value={nomeServico}
                 onChange={(e) => setNomeServico(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
               />
             </div>
 
@@ -238,7 +240,7 @@ export const QuoteModal: React.FC = () => {
                   placeholder="Ex.: 10 dias úteis"
                   value={prazoEntrega}
                   onChange={(e) => setPrazoEntrega(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  className="mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                 />
               </div>
 
@@ -343,31 +345,29 @@ export const QuoteModal: React.FC = () => {
 
           {/* Right: Printable A4 Document Sheet (ALWAYS crisp editorial white paper) */}
           <div className="bg-[#E5E7EB]/60 p-5 dark:bg-slate-950/70 lg:col-span-7 print:bg-white print:p-0">
-            <div className="quote-print-sheet mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white text-[#111827] shadow-sm print:rounded-none print:border-0 print:shadow-none">
+            <div className="quote-print-sheet mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white text-[#111827] shadow-sm print:overflow-visible print:rounded-none print:border-0 print:shadow-none">
               {/* Accent top bar */}
               <div className="h-1.5 w-full bg-[#14532D]" />
 
               <div className="p-8 sm:p-10 print:p-0 print:pt-4">
                 {/* Document Header */}
-                <div className="flex flex-wrap items-start justify-between gap-6 border-b border-gray-200 pb-6">
+                <div className="flex flex-wrap items-start justify-between gap-6 border-b border-gray-200 pb-6 print:break-inside-avoid">
                   <div className="max-w-sm">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#14532D] text-white">
-                        <Scale className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <span className="block font-display text-lg font-extrabold leading-tight tracking-tight text-[#111827]">
+                    <div className="flex items-center gap-3">
+                      <BrandLogo variant="symbol" theme="light" className="h-9 w-9" />
+                      <div className="min-w-0">
+                        <span className="block break-words font-display text-lg font-extrabold leading-tight tracking-tight text-[#111827]">
                           {nomeProfissional.trim() || 'Proposta Comercial'}
                         </span>
                         {state.professional.especialidade && (
-                          <span className="block text-xs font-medium text-gray-500">
+                          <span className="block break-words text-xs font-medium text-gray-500">
                             {state.professional.especialidade}
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <div className="mt-3 space-y-0.5 text-[11px] text-gray-500">
+                    <div className="mt-3 space-y-0.5 break-words text-[11px] text-gray-500">
                       {state.professional.documento && <p>{state.professional.documento}</p>}
                       {(state.professional.email || state.professional.telefone) && (
                         <p>
@@ -403,27 +403,38 @@ export const QuoteModal: React.FC = () => {
                 </div>
 
                 {/* Client & Proposal Metadata */}
-                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 print:break-inside-avoid">
                   <div className="rounded-xl border border-gray-200 bg-[#F9FAFB] p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
                       Preparado para
                     </p>
-                    <p className="mt-1 text-sm font-bold text-[#111827]">
-                      {nomeCliente.trim() || 'Cliente (informe o nome ao lado)'}
+                    <p className="mt-1 break-words text-sm font-bold text-[#111827]">
+                      {nomeCliente.trim() ? (
+                        nomeCliente.trim()
+                      ) : (
+                        <>
+                          <span className="no-print font-normal text-gray-500">
+                            Cliente (informe o nome ao lado)
+                          </span>
+                          <span className="hidden print:inline">A/C do Cliente</span>
+                        </>
+                      )}
                     </p>
                     {empresaCliente.trim() && (
-                      <p className="mt-0.5 text-xs text-gray-600">{empresaCliente.trim()}</p>
+                      <p className="mt-0.5 break-words text-xs text-gray-600">
+                        {empresaCliente.trim()}
+                      </p>
                     )}
                   </div>
 
                   <div className="rounded-xl border border-gray-200 bg-[#F9FAFB] p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
                       Prazo estimado de entrega
                     </p>
-                    <p className="mt-1 text-sm font-bold text-[#111827]">
+                    <p className="mt-1 break-words text-sm font-bold text-[#111827]">
                       {prazoEntrega.trim() || 'A combinar após aprovação'}
                     </p>
-                    <p className="mt-0.5 text-xs text-gray-500">
+                    <p className="mt-0.5 text-xs text-gray-600">
                       Início imediato mediante confirmação da proposta
                     </p>
                   </div>
@@ -431,26 +442,26 @@ export const QuoteModal: React.FC = () => {
 
                 {/* Scope Table */}
                 <div className="mt-6">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
                     Escopo e investimento
                   </p>
-                  <div className="mt-2 overflow-hidden rounded-xl border border-gray-200">
-                    <div className="flex items-center justify-between border-b border-gray-200 bg-[#F3F4F6] px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-gray-600">
+                  <div className="mt-2 overflow-hidden rounded-xl border border-gray-200 print:overflow-visible">
+                    <div className="flex items-center justify-between border-b border-gray-200 bg-[#F3F4F6] px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-gray-700">
                       <span>Descrição do serviço</span>
                       <span>Investimento</span>
                     </div>
                     <div className="flex items-start justify-between gap-6 px-4 py-5">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-[#111827]">
+                        <p className="break-words text-sm font-bold text-[#111827]">
                           {nomeServico.trim() || 'Serviço'}
                         </p>
                         {descricao.trim() && (
-                          <p className="mt-2 whitespace-pre-line text-xs leading-relaxed text-gray-600">
+                          <p className="mt-2 whitespace-pre-line break-words text-[13px] leading-relaxed text-gray-700 [overflow-wrap:anywhere]">
                             {descricao.trim()}
                           </p>
                         )}
                       </div>
-                      <p className="shrink-0 text-sm font-bold text-[#111827] tabular-nums">
+                      <p className="shrink-0 text-base font-bold text-[#111827] tabular-nums">
                         {formatCurrencyBRL(safeValor)}
                       </p>
                     </div>
@@ -458,7 +469,7 @@ export const QuoteModal: React.FC = () => {
                 </div>
 
                 {/* Highlighted Total */}
-                <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-[#14532D] px-6 py-5 text-white">
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-xl bg-[#14532D] px-6 py-5 text-white print:break-inside-avoid">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wider text-emerald-200">
                       Investimento total
@@ -474,11 +485,11 @@ export const QuoteModal: React.FC = () => {
 
                 {/* Commercial Notes */}
                 {observacoes.trim() && (
-                  <div className="mt-6 rounded-xl border border-gray-200 p-4">
+                  <div className="mt-6 rounded-xl border border-gray-200 p-4 print:break-inside-avoid">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
                       Condições comerciais e observações
                     </p>
-                    <p className="mt-1.5 whitespace-pre-line text-xs leading-relaxed text-gray-600">
+                    <p className="mt-1.5 whitespace-pre-line break-words text-xs leading-relaxed text-gray-600 [overflow-wrap:anywhere]">
                       {observacoes.trim()}
                     </p>
                   </div>
@@ -486,13 +497,13 @@ export const QuoteModal: React.FC = () => {
 
                 {/* Approval / Acceptance Block */}
                 {incluirAssinatura && (
-                  <div className="mt-8 grid grid-cols-1 gap-6 border-t border-gray-200 pt-6 sm:grid-cols-2">
+                  <div className="mt-8 grid grid-cols-1 gap-6 border-t border-gray-200 pt-6 sm:grid-cols-2 print:break-inside-avoid">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
                         Responsável pela proposta
                       </p>
                       <div className="mt-7 border-b border-gray-300" />
-                      <p className="mt-1.5 text-xs font-semibold text-gray-700">
+                      <p className="mt-1.5 break-words text-xs font-semibold text-gray-700">
                         {nomeProfissional.trim() || 'Profissional Responsável'}
                       </p>
                       <p className="text-[11px] text-gray-400">
@@ -504,7 +515,7 @@ export const QuoteModal: React.FC = () => {
                         De acordo do cliente
                       </p>
                       <div className="mt-7 border-b border-gray-300" />
-                      <p className="mt-1.5 text-xs font-semibold text-gray-700">
+                      <p className="mt-1.5 break-words text-xs font-semibold text-gray-700">
                         {nomeCliente.trim() || 'Assinatura / Aprovação'}
                       </p>
                       <p className="text-[11px] text-gray-400">Data: ____ / ____ / ________</p>
@@ -513,9 +524,12 @@ export const QuoteModal: React.FC = () => {
                 )}
 
                 {/* Minimal Footer */}
-                <div className="mt-8 flex items-center justify-between border-t border-gray-100 pt-4 text-[10px] text-gray-400">
+                <div className="mt-8 flex items-center justify-between border-t border-gray-100 pt-4 text-[10px] text-gray-500 print:break-inside-avoid">
                   <span>Proposta #{numeroOrcamento}</span>
-                  <span>Gerado com Preço Justo</span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span>Gerado com</span>
+                    <BrandLogo variant="horizontal" theme="light" className="h-3.5 w-auto" />
+                  </span>
                 </div>
               </div>
             </div>

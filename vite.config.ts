@@ -12,9 +12,13 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          charts: ['recharts'],
-          icons: ['lucide-react'],
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('lucide-react')) return 'icons';
+          if (id.includes('recharts')) return 'recharts';
+          if (id.includes('d3-') || id.includes('victory-vendor')) return 'd3-vendor';
+          if (id.includes('react-dom') || id.includes('react/')) return 'react-vendor';
+          return undefined;
         },
       },
     },

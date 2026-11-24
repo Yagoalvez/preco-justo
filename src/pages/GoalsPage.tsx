@@ -15,7 +15,7 @@ import {
 import { useApp } from '../context/AppContext';
 import { calculateProfileSummary } from '../utils/pricing';
 import { calculateServiceGoalProjection, calculateServiceMixSummary } from '../utils/planning';
-import { formatCurrencyBRL, formatHours, formatPercent } from '../utils/format';
+import { formatCurrencyBRL, formatHours, formatPercent, parseNumericInput } from '../utils/format';
 import { DemoBadge } from '../components/EmptyState';
 
 export const GoalsPage: React.FC = () => {
@@ -30,7 +30,16 @@ export const GoalsPage: React.FC = () => {
   const [customHoursStr, setCustomHoursStr] = useState<string>('');
 
   useEffect(() => {
-    setMetaStr(state.goal.metaFaturamentoMensal > 0 ? String(state.goal.metaFaturamentoMensal) : '');
+    const currentParsed = parseNumericInput(metaStr, 0);
+    if (
+      !Number.isFinite(currentParsed) ||
+      Math.abs(currentParsed - state.goal.metaFaturamentoMensal) > 0.005
+    ) {
+      setMetaStr(
+        state.goal.metaFaturamentoMensal > 0 ? String(state.goal.metaFaturamentoMensal) : ''
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.goal.metaFaturamentoMensal]);
 
   const profileSummary = useMemo(
@@ -41,7 +50,7 @@ export const GoalsPage: React.FC = () => {
   const horasFaturaveis = profileSummary?.horasFaturaveisMensais ?? null;
 
   const metaValor = useMemo(() => {
-    const n = Number(metaStr.replace(',', '.'));
+    const n = parseNumericInput(metaStr, 0);
     return Number.isFinite(n) && n > 0 ? n : 0;
   }, [metaStr]);
 
@@ -52,7 +61,7 @@ export const GoalsPage: React.FC = () => {
 
   const handleMetaChange = (val: string) => {
     setMetaStr(val);
-    const parsed = Number(val.replace(',', '.'));
+    const parsed = parseNumericInput(val, 0);
     if (val.trim() === '') {
       updateGoal({ metaFaturamentoMensal: 0 });
     } else if (Number.isFinite(parsed) && parsed >= 0) {
@@ -100,8 +109,8 @@ export const GoalsPage: React.FC = () => {
 
   // Projeção para ticket personalizado
   const customProjection = useMemo(() => {
-    const price = Number(customPriceStr.replace(',', '.'));
-    const hours = Number(customHoursStr.replace(',', '.'));
+    const price = parseNumericInput(customPriceStr, NaN);
+    const hours = parseNumericInput(customHoursStr, NaN);
     if (metaValor <= 0 || !Number.isFinite(price) || price <= 0 || !Number.isFinite(hours) || hours <= 0) {
       return null;
     }
@@ -199,7 +208,7 @@ export const GoalsPage: React.FC = () => {
 
       {/* Top Grid: Goal Input + Capacity Metrics */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <div className="rounded-2xl border border-[#16A34A]/30 bg-white p-6 dark:border-emerald-800/70 dark:bg-[#111827] lg:col-span-5">
+        <div className="rounded-2xl border border-[#16A34A]/40 bg-white p-5 sm:p-6 dark:border-emerald-700/70 dark:bg-[#111827] lg:col-span-5">
           <div className="flex items-center justify-between gap-2">
             <label
               htmlFor="goal-monthly-revenue"
@@ -210,9 +219,9 @@ export const GoalsPage: React.FC = () => {
             <button
               type="button"
               onClick={handleApplyRecommendedRevenue}
-              className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-[#16A34A] hover:underline dark:text-emerald-400"
+              className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-xs font-semibold text-[#16A34A] hover:underline dark:text-emerald-400"
             >
-              <Sparkles className="h-3 w-3" />
+              <Sparkles className="h-3.5 w-3.5" />
               Sugerir pelo perfil
             </button>
           </div>
@@ -229,52 +238,52 @@ export const GoalsPage: React.FC = () => {
               placeholder="10000"
               value={metaStr}
               onChange={(e) => handleMetaChange(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-12 pr-4 font-display text-2xl font-extrabold text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+              className="w-full rounded-xl border border-gray-200 bg-white py-3 pl-12 pr-4 font-display text-2xl font-extrabold text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
             />
           </div>
-          <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
+          <p className="mt-2 text-xs text-gray-600 dark:text-slate-400">
             Faturamento bruto mensal desejado antes de custos, impostos e pró-labore.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:col-span-7">
-          <div className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-5 dark:border-slate-800 dark:bg-[#111827]">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
-                Capacidade faturável mensal
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:col-span-7">
+          <div className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-4 sm:p-5 dark:border-slate-700/80 dark:bg-[#111827]">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">
+                Capacidade faturável
               </span>
-              <Clock className="h-4 w-4 text-[#16A34A]" />
+              <Clock className="h-4 w-4 shrink-0 text-[#16A34A]" />
             </div>
-            <p className="mt-3 font-display text-2xl font-extrabold text-[#111827] tabular-nums dark:text-white">
+            <p className="mt-2.5 font-display text-xl font-extrabold text-[#111827] tabular-nums dark:text-white sm:text-2xl">
               {horasFaturaveis !== null ? formatHours(horasFaturaveis) : '—'}
             </p>
-            <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+            <p className="mt-1 text-xs text-gray-600 dark:text-slate-400">
               {state.profile.diasTrabalhadosMes} dias × {state.profile.horasProdutivasDia}h/dia ×{' '}
               {formatPercent(state.profile.percentualFaturavel, 0)} faturável
             </p>
           </div>
 
-          <div className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-5 dark:border-slate-800 dark:bg-[#111827]">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
-                Receita necessária / hora
+          <div className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-4 sm:p-5 dark:border-slate-700/80 dark:bg-[#111827]">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">
+                Receita / hora alvo
               </span>
-              <Target className="h-4 w-4 text-[#16A34A]" />
+              <Target className="h-4 w-4 shrink-0 text-[#16A34A]" />
             </div>
-            <p className="mt-3 font-display text-2xl font-extrabold text-[#14532D] tabular-nums dark:text-emerald-400">
+            <p className="mt-2.5 font-display text-xl font-extrabold text-[#14532D] tabular-nums dark:text-emerald-400 sm:text-2xl">
               {receitaHoraNecessaria !== null ? `${formatCurrencyBRL(receitaHoraNecessaria)}/h` : '—'}
             </p>
-            <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+            <p className="mt-1 text-xs text-gray-600 dark:text-slate-400">
               {profileSummary && profileSummary.custoHora > 0
                 ? `Custo base atual: ${formatCurrencyBRL(profileSummary.custoHora)}/h`
-                : 'Informe uma meta para ver o ticket/hora necessário'}
+                : 'Informe uma meta para ver o ticket/hora'}
             </p>
           </div>
         </div>
       </div>
 
       {/* Section 1: Cenários por serviço cadastrado */}
-      <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-800 dark:bg-[#111827]">
+      <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-700/80 dark:bg-[#111827]">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-base font-bold text-[#111827] dark:text-white">
@@ -398,7 +407,7 @@ export const GoalsPage: React.FC = () => {
       {/* Section 2: Mix de Serviços + Simulador rápido avulso */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Mix Builder */}
-        <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-800 dark:bg-[#111827] lg:col-span-7">
+        <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-700/80 dark:bg-[#111827] lg:col-span-7">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-[#111827] dark:text-white">
@@ -448,10 +457,11 @@ export const GoalsPage: React.FC = () => {
                           type="button"
                           onClick={() => handleAdjustMix(srv.id, -1)}
                           disabled={qty === 0}
+                          title={`Diminuir quantidade de ${srv.nome}`}
                           aria-label={`Diminuir quantidade de ${srv.nome}`}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-[#1A2333] dark:text-slate-200 dark:hover:bg-slate-800"
                         >
-                          <Minus className="h-3.5 w-3.5" />
+                          <Minus className="h-4 w-4" />
                         </button>
                         <span className="w-8 text-center text-sm font-bold text-[#111827] tabular-nums dark:text-white">
                           {qty}
@@ -459,10 +469,11 @@ export const GoalsPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleAdjustMix(srv.id, 1)}
+                          title={`Aumentar quantidade de ${srv.nome}`}
                           aria-label={`Aumentar quantidade de ${srv.nome}`}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:border-[#16A34A] hover:bg-[#F0FDF4] hover:text-[#14532D] dark:border-slate-700 dark:text-slate-300 dark:hover:bg-emerald-950/60 dark:hover:text-emerald-300"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:border-[#16A34A] hover:bg-[#F0FDF4] hover:text-[#14532D] dark:border-slate-700 dark:bg-[#1A2333] dark:text-slate-200 dark:hover:bg-emerald-950/60 dark:hover:text-emerald-300"
                         >
-                          <Plus className="h-3.5 w-3.5" />
+                          <Plus className="h-4 w-4" />
                         </button>
                       </div>
                     </li>
@@ -520,7 +531,7 @@ export const GoalsPage: React.FC = () => {
         </section>
 
         {/* Simulador rápido de ticket avulso */}
-        <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-800 dark:bg-[#111827] lg:col-span-5">
+        <section className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-slate-700/80 dark:bg-[#111827] lg:col-span-5">
           <h2 className="text-base font-bold text-[#111827] dark:text-white">
             Simulador rápido de ticket
           </h2>
@@ -544,7 +555,7 @@ export const GoalsPage: React.FC = () => {
                 placeholder="1500"
                 value={customPriceStr}
                 onChange={(e) => setCustomPriceStr(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
               />
             </div>
 
@@ -563,7 +574,7 @@ export const GoalsPage: React.FC = () => {
                 placeholder="12"
                 value={customHoursStr}
                 onChange={(e) => setCustomHoursStr(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
               />
             </div>
           </div>

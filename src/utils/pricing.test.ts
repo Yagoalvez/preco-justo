@@ -3,10 +3,14 @@ import {
   calculatePricing,
   calculateProfileSummary,
   diagnoseCurrentPrice,
+  floorToDecimals,
   simulateNegotiationDiscount,
+  validateFinancialProfileValues,
 } from './pricing';
 import { calculateServiceGoalProjection, calculateServiceMixSummary } from './planning';
 import { generateSmartRecommendations } from './recommendations';
+import { parseNumericInput } from './format';
+import { parseAndValidateBackup, sanitizeStatePayload } from './backup';
 import { AppState } from '../types';
 
 describe('Fórmulas matemáticas do Preço Justo', () => {
@@ -425,5 +429,172 @@ describe('Recomendações inteligentes determinísticas', () => {
     const recs = generateSmartRecommendations(healthyState, 400);
     expect(recs[0]?.id).toBe('rec-healthy-structure');
     expect(recs[0]?.severity).toBe('healthy');
+  });
+
+  it('considera custos fixos manuais nas recomendações quando modo automático está desativado', () => {
+    const manualState: AppState = {
+      ...baseState,
+      costs: [],
+      profile: {
+        ...baseState.profile,
+        usarCustosMensaisAutomaticos: false,
+        custosFixosManuais: 4000,
+      },
+      services: [],
+    };
+    const recs = generateSmartRecommendations(manualState, 0);
+    expect(recs.some((r) => r.id === 'rec-heavy-fixed-costs')).toBe(true);
+    expect(recs.some((r) => r.id === 'rec-no-costs')).toBe(false);
+  });
+});
+
+describe('Regressões da auditoria: limite de desconto, parsing numérico, custos manuais e backup JSON', () => {
+  it('trunca para baixo o teto de desconto seguro (25% margem + 6% impostos = 26,5% sem prejuízo)', () => {
+    const calc = calculatePricing({
+      remuneracaoMensal: 5500,
+      custosFixosMensais: 1578.9,
+      diasTrabalhadosMes: 20,
+      horasProdutivasDia: 6,
+      percentualFaturavel: 75,
+      horasNecessarias: 10,
+      custosAdicionais: 100,
+      margemLucro: 25,
+      impostosTaxas: 6,
+    });
+    expect(calc.ok).toBe(true);
+    if (!calc.ok) return;
+
+    const rawMax =
+      ((calc.data.precoRecomendado - calc.data.precoMinimo) / calc.data.precoRecomendado) * 100;
+    const safePreset = floorToDecimals(rawMax, 1);
+    expect(safePreset).toBe(26.5);
+
+    const sim = simulateNegotiationDiscount({
+      descontoPercentual: safePreset,
+      custoServico: calc.data.custoServico,
+      precoMinimo: calc.data.precoMinimo,
+      precoRecomendado: calc.data.precoRecomendado,
+      impostosTaxasPercent: 6,
+    });
+    expect(sim.ok).toBe(true);
+    if (!sim.ok) return;
+    expect(sim.data.geraPrejuizo).toBe(false);
+    expect(sim.data.lucroLiquidoComDesconto).toBeGreaterThanOrEqual(0);
+  });
+
+  it('interpreta corretamente números em formato brasileiro e padrão via parseNumericInput', () => {
+    expect(parseNumericInput('')).toBe(0);
+    expect(parseNumericInput('', NaN)).toBeNaN();
+    expect(parseNumericInput('149,90')).toBeCloseTo(149.9, 5);
+    expect(parseNumericInput('1.500,50')).toBeCloseTo(1500.5, 5);
+    expect(parseNumericInput('2500.75')).toBeCloseTo(2500.75, 5);
+    expect(parseNumericInput('-500')).toBe(-500);
+    expect(parseNumericInput('texto')).toBeNaN();
+  });
+
+  it('valida custos fixos manuais negativos na Etapa 1', () => {
+    const errs = validateFinancialProfileValues({
+      remuneracaoMensal: 4500,
+      custosFixosMensais: -500,
+      diasTrabalhadosMes: 20,
+      horasProdutivasDia: 6,
+      percentualFaturavel: 75,
+    });
+    expect(errs.custosFixosMensais).toBeDefined();
+  });
+
+  it('valida e rejeita backups JSON inválidos ou de outras aplicações', () => {
+    expect(parseAndValidateBackup('').ok).toBe(false);
+    expect(parseAndValidateBackup('{json quebrado').ok).toBe(false);
+    expect(parseAndValidateBackup('[]').ok).toBe(false);
+    expect(parseAndValidateBackup(JSON.stringify({ app: 'outro-app', data: {} })).ok).toBe(false);
+    expect(parseAndValidateBackup(JSON.stringify({ profile: {} })).ok).toBe(false);
+    expect(
+      parseAndValidateBackup(
+        JSON.stringify({ app: 'preco-justo', data: { services: 'invalido' } })
+      ).ok
+    ).toBe(false);
+  });
+
+  it('sanitiza backup válido, descarta histórico corrompido e impede margem + impostos >= 100%', () => {
+    const validCalc = calculatePricing({
+      remuneracaoMensal: 4500,
+      custosFixosMensais: 900,
+      diasTrabalhadosMes: 20,
+      horasProdutivasDia: 6,
+      percentualFaturavel: 75,
+      horasNecessarias: 10,
+      custosAdicionais: 100,
+      margemLucro: 20,
+      impostosTaxas: 10,
+    });
+    expect(validCalc.ok).toBe(true);
+    if (!validCalc.ok) return;
+
+    const payload = {
+      app: 'preco-justo',
+      schemaVersion: 2,
+      exportedAt: '2026-11-24T10:00:00.000Z',
+      data: {
+        profile: {
+          remuneracaoMensal: 5000,
+          margemLucroPadrao: 80,
+          impostosTaxasPadrao: 30,
+        },
+        costs: [{ nome: 'Internet', categoria: 'Internet', valor: 120 }],
+        services: [
+          {
+            nome: 'Site',
+            categoria: 'Desenvolvimento',
+            tempoEstimado: 10,
+            custoAdicional: 0,
+            precoRecomendado: 2000,
+            margemLucro: 70,
+            impostosTaxas: 40,
+          },
+        ],
+        history: [
+          {
+            id: 'h-corrupt',
+            serviceName: 'Corrompido',
+            inputs: { horasNecessarias: -5 },
+            result: {},
+          },
+          {
+            id: 'h-ok',
+            serviceName: 'Válido',
+            categoria: 'Consultoria',
+            descricao: 'OK',
+            inputs: {
+              remuneracaoMensal: 4500,
+              custosFixosMensais: 900,
+              diasTrabalhadosMes: 20,
+              horasProdutivasDia: 6,
+              percentualFaturavel: 75,
+              horasNecessarias: 10,
+              custosAdicionais: 100,
+              margemLucro: 20,
+              impostosTaxas: 10,
+            },
+            result: validCalc.data,
+          },
+        ],
+      },
+    };
+
+    const parsed = parseAndValidateBackup(JSON.stringify(payload), 'light');
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    expect(parsed.state.profile.margemLucroPadrao + parsed.state.profile.impostosTaxasPadrao).toBeLessThan(100);
+    expect(parsed.state.services[0].margemLucro + parsed.state.services[0].impostosTaxas).toBeLessThan(100);
+    expect(parsed.state.history).toHaveLength(1);
+    expect(parsed.state.history[0].id).toBe('h-ok');
+    expect(parsed.summary.costsCount).toBe(1);
+    expect(parsed.summary.servicesCount).toBe(1);
+    expect(parsed.summary.historyCount).toBe(1);
+
+    const sanitizedDirect = sanitizeStatePayload({ profile: { remuneracaoMensal: -200 } as AppState['profile'] });
+    expect(sanitizedDirect.profile.remuneracaoMensal).toBe(0);
   });
 });

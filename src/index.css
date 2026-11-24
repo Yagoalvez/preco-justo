@@ -85,7 +85,13 @@
     padding: 0 !important;
     max-width: 100% !important;
     width: 100% !important;
+    overflow: visible !important;
     background: #ffffff !important;
     color: #111827 !important;
+  }
+
+  .quote-print-sheet p {
+    orphans: 3;
+    widows: 3;
   }
 }

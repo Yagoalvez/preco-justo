@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Plus,
   Search,
@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { SERVICE_CATEGORIES, ServiceCategory, ServiceItem } from '../types';
-import { formatCurrencyBRL, formatHours } from '../utils/format';
+import { formatCurrencyBRL, formatHours, parseNumericInput } from '../utils/format';
 import { calculatePricing, getEffectiveMonthlyCosts } from '../utils/pricing';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { DemoBadge, EmptyState } from '../components/EmptyState';
@@ -44,10 +44,21 @@ export const ServicesPage: React.FC = () => {
   const [descricao, setDescricao] = useState('');
   const [tempoStr, setTempoStr] = useState('');
   const [custoAdicionalStr, setCustoAdicionalStr] = useState('0');
+  const [margemStr, setMargemStr] = useState(String(state.profile.margemLucroPadrao));
+  const [impostosStr, setImpostosStr] = useState(String(state.profile.impostosTaxasPadrao));
   const [precoStr, setPrecoStr] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<ServiceItem | null>(null);
+
+  useEffect(() => {
+    if (!formOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFormOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [formOpen]);
 
   const filteredServices = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -76,6 +87,8 @@ export const ServicesPage: React.FC = () => {
     setDescricao('');
     setTempoStr('');
     setCustoAdicionalStr('0');
+    setMargemStr(String(state.profile.margemLucroPadrao));
+    setImpostosStr(String(state.profile.impostosTaxasPadrao));
     setPrecoStr('');
     setFormError(null);
     setFormOpen(true);
@@ -88,16 +101,34 @@ export const ServicesPage: React.FC = () => {
     setDescricao(item.descricao);
     setTempoStr(String(item.tempoEstimado));
     setCustoAdicionalStr(String(item.custoAdicional));
+    setMargemStr(String(item.margemLucro ?? state.profile.margemLucroPadrao));
+    setImpostosStr(String(item.impostosTaxas ?? state.profile.impostosTaxasPadrao));
     setPrecoStr(String(item.precoRecomendado));
     setFormError(null);
     setFormOpen(true);
   };
 
   const handleAutoCalculatePrice = () => {
-    const horas = Number(tempoStr.replace(',', '.'));
-    const extra = Number((custoAdicionalStr || '0').replace(',', '.'));
+    const horas = parseNumericInput(tempoStr, NaN);
+    const extra = parseNumericInput(custoAdicionalStr, 0);
+    const margem = parseNumericInput(margemStr, NaN);
+    const impostos = parseNumericInput(impostosStr, NaN);
     if (!Number.isFinite(horas) || horas <= 0) {
       setFormError('Informe primeiro o tempo estimado (em horas) para calcular o preço.');
+      return;
+    }
+    if (!Number.isFinite(extra) || extra < 0) {
+      setFormError('O custo adicional não pode ser negativo.');
+      return;
+    }
+    if (
+      !Number.isFinite(margem) ||
+      !Number.isFinite(impostos) ||
+      margem < 0 ||
+      impostos < 0 ||
+      margem + impostos >= 100
+    ) {
+      setFormError('A soma da margem de lucro com impostos e taxas deve ser menor que 100%.');
       return;
     }
     const custosFixosMensais = getEffectiveMonthlyCosts(state.profile, totalMonthlyCosts);
@@ -108,9 +139,9 @@ export const ServicesPage: React.FC = () => {
       horasProdutivasDia: state.profile.horasProdutivasDia,
       percentualFaturavel: state.profile.percentualFaturavel,
       horasNecessarias: horas,
-      custosAdicionais: Number.isFinite(extra) && extra >= 0 ? extra : 0,
-      margemLucro: state.profile.margemLucroPadrao,
-      impostosTaxas: state.profile.impostosTaxasPadrao,
+      custosAdicionais: extra,
+      margemLucro: margem,
+      impostosTaxas: impostos,
     });
 
     if (!calc.ok) {
@@ -125,15 +156,17 @@ export const ServicesPage: React.FC = () => {
     notify({
       type: 'info',
       title: 'Preço sugerido calculado',
-      description: `Baseado no seu perfil atual (${state.profile.margemLucroPadrao}% margem e ${state.profile.impostosTaxasPadrao}% impostos).`,
+      description: `Baseado no seu perfil atual (${margem}% margem e ${impostos}% impostos).`,
     });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const tempo = Number(tempoStr.replace(',', '.'));
-    const extra = Number((custoAdicionalStr || '0').replace(',', '.'));
-    const preco = Number(precoStr.replace(',', '.'));
+    const tempo = parseNumericInput(tempoStr, NaN);
+    const extra = parseNumericInput(custoAdicionalStr, 0);
+    const margem = parseNumericInput(margemStr, NaN);
+    const impostos = parseNumericInput(impostosStr, NaN);
+    const preco = parseNumericInput(precoStr, NaN);
 
     if (!nome.trim()) {
       setFormError('Informe o nome do serviço.');
@@ -145,6 +178,16 @@ export const ServicesPage: React.FC = () => {
     }
     if (!Number.isFinite(extra) || extra < 0) {
       setFormError('O custo adicional não pode ser negativo.');
+      return;
+    }
+    if (
+      !Number.isFinite(margem) ||
+      !Number.isFinite(impostos) ||
+      margem < 0 ||
+      impostos < 0 ||
+      margem + impostos >= 100
+    ) {
+      setFormError('A soma da margem de lucro com impostos e taxas deve ser menor que 100%.');
       return;
     }
     if (!Number.isFinite(preco) || preco <= 0) {
@@ -159,6 +202,8 @@ export const ServicesPage: React.FC = () => {
         descricao: descricao.trim(),
         tempoEstimado: tempo,
         custoAdicional: Number(extra.toFixed(2)),
+        margemLucro: margem,
+        impostosTaxas: impostos,
         precoRecomendado: Number(preco.toFixed(2)),
       });
     } else {
@@ -169,8 +214,8 @@ export const ServicesPage: React.FC = () => {
         tempoEstimado: tempo,
         custoAdicional: Number(extra.toFixed(2)),
         precoRecomendado: Number(preco.toFixed(2)),
-        margemLucro: state.profile.margemLucroPadrao,
-        impostosTaxas: state.profile.impostosTaxasPadrao,
+        margemLucro: margem,
+        impostosTaxas: impostos,
       });
     }
 
@@ -272,12 +317,12 @@ export const ServicesPage: React.FC = () => {
           {filteredServices.map((service) => (
             <article
               key={service.id}
-              className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-5 transition-colors hover:border-gray-300 dark:border-slate-800 dark:bg-[#111827] dark:hover:border-slate-700"
+              className="flex flex-col justify-between rounded-2xl border border-gray-200 bg-white p-5 transition-colors hover:border-gray-300 dark:border-slate-700/80 dark:bg-[#111827] dark:hover:border-slate-600"
             >
               <div>
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex rounded-lg bg-[#F3F4F6] px-2.5 py-1 text-[11px] font-semibold text-gray-700 dark:bg-slate-800 dark:text-slate-300">
+                    <span className="inline-flex rounded-lg bg-[#F3F4F6] px-2.5 py-1 text-xs font-semibold text-gray-700 dark:bg-[#1A2333] dark:text-slate-200">
                       {service.categoria}
                     </span>
                     {service.isDemo && <DemoBadge />}
@@ -286,46 +331,57 @@ export const ServicesPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => openEditForm(service)}
+                      title="Editar serviço"
                       aria-label={`Editar ${service.nome}`}
-                      className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-[#111827] dark:hover:bg-slate-800 dark:hover:text-white"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-gray-500 transition-colors hover:border-gray-200 hover:bg-gray-100 hover:text-[#111827] dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
                       onClick={() => setDeleteTarget(service)}
+                      title="Excluir serviço"
                       aria-label={`Excluir ${service.nome}`}
-                      className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-gray-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:text-slate-300 dark:hover:border-red-900/60 dark:hover:bg-red-950/50 dark:hover:text-red-400"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
 
-                <h2 className="mt-3 font-display text-lg font-bold text-[#111827] dark:text-white">
+                <h2 className="mt-2.5 font-display text-lg font-bold text-[#111827] dark:text-white">
                   {service.nome}
                 </h2>
-                <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-gray-600 dark:text-slate-400">
+                <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-gray-600 dark:text-slate-300">
                   {service.descricao || 'Sem descrição cadastrada.'}
                 </p>
 
-                <div className="mt-4 flex flex-wrap items-center gap-4 border-t border-gray-100 pt-4 text-xs text-gray-500 dark:border-slate-800 dark:text-slate-400">
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-gray-100 pt-3.5 text-xs text-gray-600 dark:border-slate-800 dark:text-slate-300">
                   <span className="inline-flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 text-gray-400" />
-                    Tempo: <strong className="font-semibold text-gray-700 dark:text-slate-200">{formatHours(service.tempoEstimado)}</strong>
+                    <Clock className="h-3.5 w-3.5 text-gray-400 dark:text-slate-400" />
+                    Tempo:{' '}
+                    <strong className="font-semibold text-[#111827] tabular-nums dark:text-white">
+                      {formatHours(service.tempoEstimado)}
+                    </strong>
                   </span>
                   <span>
                     Custo adicional:{' '}
-                    <strong className="font-semibold text-gray-700 tabular-nums dark:text-slate-200">
+                    <strong className="font-semibold text-[#111827] tabular-nums dark:text-white">
                       {formatCurrencyBRL(service.custoAdicional)}
+                    </strong>
+                  </span>
+                  <span>
+                    Margem:{' '}
+                    <strong className="font-semibold text-[#111827] tabular-nums dark:text-white">
+                      {service.margemLucro}%
                     </strong>
                   </span>
                 </div>
               </div>
 
-              <div className="mt-5 flex flex-wrap items-end justify-between gap-3 border-t border-gray-100 pt-4 dark:border-slate-800">
+              <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t border-gray-100 pt-4 dark:border-slate-800">
                 <div>
-                  <span className="block text-[11px] font-medium text-gray-500 dark:text-slate-400">
+                  <span className="block text-xs font-medium text-gray-600 dark:text-slate-400">
                     Preço recomendado
                   </span>
                   <span className="font-display text-xl font-extrabold text-[#14532D] tabular-nums dark:text-emerald-400">
@@ -350,7 +406,7 @@ export const ServicesPage: React.FC = () => {
                         },
                       })
                     }
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 dark:border-slate-700 dark:bg-[#1A2333] dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     <Calculator className="h-3.5 w-3.5" />
                     Recalcular
@@ -364,7 +420,7 @@ export const ServicesPage: React.FC = () => {
                         valorFinal: service.precoRecomendado,
                       })
                     }
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#16A34A] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#15803D]"
+                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-xl bg-[#16A34A] px-3.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#15803D]"
                   >
                     <FileText className="h-3.5 w-3.5" />
                     Orçamento
@@ -379,10 +435,13 @@ export const ServicesPage: React.FC = () => {
       {/* Add / Edit Service Modal */}
       {formOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[1px]"
+          className="no-print fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[1px]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="service-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setFormOpen(false);
+          }}
         >
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-[#111827]">
             <div className="flex items-center justify-between">
@@ -417,7 +476,7 @@ export const ServicesPage: React.FC = () => {
                     placeholder="Ex.: Desenvolvimento de landing page"
                     value={nome}
                     onChange={(e) => setNome(e.target.value)}
-                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                   />
                 </div>
                 <div>
@@ -431,7 +490,7 @@ export const ServicesPage: React.FC = () => {
                     id="srv-cat"
                     value={categoria}
                     onChange={(e) => setCategoria(e.target.value as ServiceCategory)}
-                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                   >
                     {SERVICE_CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
@@ -455,7 +514,7 @@ export const ServicesPage: React.FC = () => {
                   placeholder="O que está incluído na entrega deste serviço..."
                   value={descricao}
                   onChange={(e) => setDescricao(e.target.value)}
-                  className="mt-1.5 w-full resize-none rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  className="mt-1.5 w-full resize-none rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                 />
               </div>
 
@@ -475,7 +534,7 @@ export const ServicesPage: React.FC = () => {
                     placeholder="10"
                     value={tempoStr}
                     onChange={(e) => setTempoStr(e.target.value)}
-                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                   />
                 </div>
                 <div>
@@ -497,8 +556,57 @@ export const ServicesPage: React.FC = () => {
                       placeholder="0"
                       value={custoAdicionalStr}
                       onChange={(e) => setCustoAdicionalStr(e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-3.5 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                      className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-3.5 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                     />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="srv-margin"
+                    className="block text-xs font-semibold text-gray-700 dark:text-slate-300"
+                  >
+                    Margem de lucro (%)
+                  </label>
+                  <div className="relative mt-1.5">
+                    <input
+                      id="srv-margin"
+                      type="number"
+                      min="0"
+                      max="99"
+                      step="1"
+                      value={margemStr}
+                      onChange={(e) => setMargemStr(e.target.value)}
+                      className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-3.5 pr-8 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
+                    />
+                    <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                      %
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label
+                    htmlFor="srv-tax"
+                    className="block text-xs font-semibold text-gray-700 dark:text-slate-300"
+                  >
+                    Impostos e taxas (%)
+                  </label>
+                  <div className="relative mt-1.5">
+                    <input
+                      id="srv-tax"
+                      type="number"
+                      min="0"
+                      max="99"
+                      step="0.5"
+                      value={impostosStr}
+                      onChange={(e) => setImpostosStr(e.target.value)}
+                      className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-3.5 pr-8 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
+                    />
+                    <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                      %
+                    </span>
                   </div>
                 </div>
               </div>
@@ -532,7 +640,7 @@ export const ServicesPage: React.FC = () => {
                     placeholder="1500.00"
                     value={precoStr}
                     onChange={(e) => setPrecoStr(e.target.value)}
-                    className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-3.5 text-sm font-semibold text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-3.5 text-sm font-semibold text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                   />
                 </div>
               </div>

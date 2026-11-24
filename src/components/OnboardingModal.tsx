@@ -5,15 +5,15 @@ import {
   Calculator,
   Database,
   Receipt,
-  Scale,
   Target,
   X,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { BrandLogo } from './BrandLogo';
 
 const SLIDES = [
   {
-    icon: Scale,
+    icon: null,
     eyebrow: 'Bem-vindo ao Preço Justo',
     title: 'Precifique seus serviços com base em números reais',
     description:
@@ -51,7 +51,7 @@ const SLIDES = [
 ];
 
 export const OnboardingModal: React.FC = () => {
-  const { onboardingOpen, completeOnboarding, setActivePage, loadDemoData } = useApp();
+  const { state, onboardingOpen, completeOnboarding, setActivePage, loadDemoData } = useApp();
   const [step, setStep] = useState(0);
 
   useEffect(() => {
@@ -108,9 +108,13 @@ export const OnboardingModal: React.FC = () => {
 
         {/* Content */}
         <div className="p-6 sm:p-7">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#F0FDF4] text-[#16A34A] dark:bg-emerald-950/70 dark:text-emerald-400">
-            <Icon className="h-5 w-5" />
-          </div>
+          {Icon ? (
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#F0FDF4] text-[#16A34A] dark:bg-emerald-950/70 dark:text-emerald-400">
+              <Icon className="h-5 w-5" />
+            </div>
+          ) : (
+            <BrandLogo variant="horizontal" theme={state.theme} className="h-9 w-auto" />
+          )}
 
           <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-[#16A34A] dark:text-emerald-400">
             {current.eyebrow}

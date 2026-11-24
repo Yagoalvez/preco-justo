@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Search,
   Eye,
@@ -36,6 +36,15 @@ export const HistoryPage: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [selectedItem, setSelectedItem] = useState<CalculationHistoryItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CalculationHistoryItem | null>(null);
+
+  useEffect(() => {
+    if (!selectedItem) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedItem(null);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedItem]);
 
   const filteredHistory = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -131,11 +140,11 @@ export const HistoryPage: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-slate-800 dark:bg-[#111827]">
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-slate-700/80 dark:bg-[#111827]">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[700px] text-left">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/70 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                <tr className="border-b border-gray-200/80 bg-gray-50/80 text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:border-slate-700/80 dark:bg-[#161F2E] dark:text-slate-300">
                   <th className="whitespace-nowrap px-5 py-3.5">Data</th>
                   <th className="whitespace-nowrap px-4 py-3.5">Serviço</th>
                   <th className="whitespace-nowrap px-4 py-3.5 text-right">Custo</th>
@@ -148,9 +157,9 @@ export const HistoryPage: React.FC = () => {
                 {filteredHistory.map((item) => (
                   <tr
                     key={item.id}
-                    className="transition-colors hover:bg-gray-50/70 dark:hover:bg-slate-800/40"
+                    className="transition-colors hover:bg-gray-50/80 dark:hover:bg-slate-800/50"
                   >
-                    <td className="px-5 py-3.5 text-xs text-gray-500 tabular-nums dark:text-slate-400">
+                    <td className="whitespace-nowrap px-5 py-3.5 text-xs text-gray-600 tabular-nums dark:text-slate-300">
                       {formatDateBR(item.data)}
                     </td>
                     <td className="px-4 py-3.5">
@@ -160,29 +169,29 @@ export const HistoryPage: React.FC = () => {
                         </span>
                         {item.isDemo && <DemoBadge />}
                       </div>
-                      <span className="text-xs text-gray-500 dark:text-slate-400">
+                      <span className="text-xs text-gray-600 dark:text-slate-400">
                         {item.categoria} · {formatHours(item.inputs.horasNecessarias)}
                       </span>
                     </td>
-                    <td className="px-4 py-3.5 text-right text-xs font-medium text-gray-600 tabular-nums dark:text-slate-300">
+                    <td className="whitespace-nowrap px-4 py-3.5 text-right text-xs font-medium text-gray-700 tabular-nums dark:text-slate-200">
                       {formatCurrencyBRL(item.result.custoServico)}
                     </td>
-                    <td className="px-4 py-3.5 text-right font-bold text-[#14532D] tabular-nums dark:text-emerald-400">
+                    <td className="whitespace-nowrap px-4 py-3.5 text-right font-bold text-[#14532D] tabular-nums dark:text-emerald-400">
                       {formatCurrencyBRL(item.result.precoRecomendado)}
                     </td>
-                    <td className="px-4 py-3.5 text-right">
-                      <span className="inline-flex rounded-lg bg-[#F0FDF4] px-2 py-0.5 text-xs font-semibold text-[#14532D] tabular-nums dark:bg-emerald-950/60 dark:text-emerald-300">
+                    <td className="whitespace-nowrap px-4 py-3.5 text-right">
+                      <span className="inline-flex rounded-lg bg-[#F0FDF4] px-2.5 py-0.5 text-xs font-semibold text-[#14532D] tabular-nums dark:bg-emerald-950/70 dark:text-emerald-300">
                         {formatPercent(item.result.margemEfetiva, 1)}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <div className="inline-flex items-center gap-1">
+                    <td className="whitespace-nowrap px-5 py-3.5 text-right">
+                      <div className="inline-flex items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => setSelectedItem(item)}
                           title="Consultar detalhes"
                           aria-label={`Consultar ${item.serviceName}`}
-                          className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-[#111827] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-gray-500 transition-colors hover:border-gray-200 hover:bg-gray-100 hover:text-[#111827] dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
                         >
                           <Eye className="h-4 w-4" />
                         </button>
@@ -191,7 +200,7 @@ export const HistoryPage: React.FC = () => {
                           onClick={() => duplicateHistoryItem(item.id)}
                           title="Duplicar cálculo"
                           aria-label={`Duplicar ${item.serviceName}`}
-                          className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-[#16A34A] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-emerald-400"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-gray-500 transition-colors hover:border-[#16A34A]/30 hover:bg-[#F0FDF4] hover:text-[#16A34A] dark:text-slate-300 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/50 dark:hover:text-emerald-400"
                         >
                           <CopyPlus className="h-4 w-4" />
                         </button>
@@ -200,7 +209,7 @@ export const HistoryPage: React.FC = () => {
                           onClick={() => setDeleteTarget(item)}
                           title="Excluir cálculo"
                           aria-label={`Excluir ${item.serviceName}`}
-                          className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-slate-400 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-gray-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:text-slate-300 dark:hover:border-red-900/60 dark:hover:bg-red-950/50 dark:hover:text-red-400"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -217,10 +226,13 @@ export const HistoryPage: React.FC = () => {
       {/* Detail Modal */}
       {selectedItem && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[1px]"
+          className="no-print fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[1px]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="history-detail-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedItem(null);
+          }}
         >
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-[#111827]">
             <div className="flex items-start justify-between gap-4">
@@ -333,6 +345,8 @@ export const HistoryPage: React.FC = () => {
                     },
                     profileOverride: {
                       remuneracaoMensal: item.inputs.remuneracaoMensal,
+                      usarCustosMensaisAutomaticos: false,
+                      custosFixosManuais: item.inputs.custosFixosMensais,
                       diasTrabalhadosMes: item.inputs.diasTrabalhadosMes,
                       horasProdutivasDia: item.inputs.horasProdutivasDia,
                       percentualFaturavel: item.inputs.percentualFaturavel,

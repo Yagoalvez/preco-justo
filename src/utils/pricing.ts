@@ -19,6 +19,12 @@ export interface ProfileCalculationSummary {
 
 const EPSILON = 0.01;
 
+export function floorToDecimals(value: number, decimals = 1): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  const factor = Math.pow(10, decimals);
+  return Math.floor((value + 1e-9) * factor) / factor;
+}
+
 export function getEffectiveMonthlyCosts(profile: FinancialProfile, totalRegisteredCosts: number): number {
   if (profile.usarCustosMensaisAutomaticos) {
     return Math.max(0, Number.isFinite(totalRegisteredCosts) ? totalRegisteredCosts : 0);

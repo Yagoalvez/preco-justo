@@ -76,9 +76,16 @@ export function generateId(prefix = 'id'): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export function parseNumericInput(raw: string): number {
-  if (!raw.trim()) return 0;
-  const normalized = raw.replace(/\s+/g, '').replace(',', '.');
+export function parseNumericInput(raw: string, emptyValue = 0): number {
+  const trimmed = raw.trim();
+  if (!trimmed) return emptyValue;
+  const compact = trimmed.replace(/\s+/g, '');
+  let normalized = compact;
+  if (compact.includes(',') && compact.includes('.')) {
+    normalized = compact.replace(/\./g, '').replace(',', '.');
+  } else if (compact.includes(',')) {
+    normalized = compact.replace(',', '.');
+  }
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : NaN;
 }

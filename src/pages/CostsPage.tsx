@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Plus,
   Search,
@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { COST_CATEGORIES, CostCategory, MonthlyCost } from '../types';
-import { formatCurrencyBRL } from '../utils/format';
+import { formatCurrencyBRL, parseNumericInput } from '../utils/format';
 import { calculateProfileSummary } from '../utils/pricing';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { DemoBadge, EmptyState } from '../components/EmptyState';
@@ -38,6 +38,15 @@ export const CostsPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<MonthlyCost | null>(null);
+
+  useEffect(() => {
+    if (!formOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFormOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [formOpen]);
 
   const profileSummary = useMemo(
     () => calculateProfileSummary(state.profile, totalMonthlyCosts),
@@ -84,7 +93,7 @@ export const CostsPage: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const parsedValue = Number(valorStr.replace(',', '.'));
+    const parsedValue = parseNumericInput(valorStr, NaN);
     if (!nome.trim()) {
       setFormError('Informe o nome ou descrição da despesa.');
       return;
@@ -138,9 +147,9 @@ export const CostsPage: React.FC = () => {
       </div>
 
       {/* Summary strip */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-[#16A34A]/30 bg-white p-5 dark:border-emerald-800/60 dark:bg-[#111827]">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+        <div className="col-span-2 rounded-2xl border border-[#16A34A]/35 bg-white p-4 sm:col-span-1 sm:p-5 dark:border-emerald-700/60 dark:bg-[#111827]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">
             Total mensal de custos fixos
           </p>
           <p className="mt-2 font-display text-2xl font-extrabold text-[#14532D] tabular-nums dark:text-emerald-400">
@@ -156,23 +165,23 @@ export const CostsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-slate-800 dark:bg-[#111827]">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
-            Despesas cadastradas
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5 dark:border-slate-700/80 dark:bg-[#111827]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">
+            Despesas
           </p>
-          <p className="mt-2 font-display text-2xl font-extrabold text-[#111827] tabular-nums dark:text-white">
+          <p className="mt-2 font-display text-xl font-extrabold text-[#111827] tabular-nums dark:text-white sm:text-2xl">
             {state.costs.length}
           </p>
-          <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
+          <p className="mt-2 text-xs text-gray-600 dark:text-slate-400">
             {new Set(state.costs.map((c) => c.categoria)).size} categorias utilizadas
           </p>
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-slate-800 dark:bg-[#111827]">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400">
-            Impacto por hora faturável
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5 dark:border-slate-700/80 dark:bg-[#111827]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-600 dark:text-slate-300">
+            Impacto / hora
           </p>
-          <p className="mt-2 font-display text-2xl font-extrabold text-[#111827] tabular-nums dark:text-white">
+          <p className="mt-2 font-display text-xl font-extrabold text-[#111827] tabular-nums dark:text-white sm:text-2xl">
             {hourlyCostImpact !== null ? `${formatCurrencyBRL(hourlyCostImpact)}/h` : '—'}
           </p>
           <button
@@ -240,11 +249,11 @@ export const CostsPage: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-slate-800 dark:bg-[#111827]">
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-slate-700/80 dark:bg-[#111827]">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px] text-left">
               <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/70 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400">
+                <tr className="border-b border-gray-200/80 bg-gray-50/80 text-[11px] font-semibold uppercase tracking-wider text-gray-600 dark:border-slate-700/80 dark:bg-[#161F2E] dark:text-slate-300">
                   <th className="px-5 py-3.5">Despesa</th>
                   <th className="px-4 py-3.5">Categoria</th>
                   <th className="px-4 py-3.5 text-right">Valor mensal</th>
@@ -258,7 +267,7 @@ export const CostsPage: React.FC = () => {
                   return (
                     <tr
                       key={cost.id}
-                      className="transition-colors hover:bg-gray-50/70 dark:hover:bg-slate-800/40"
+                      className="transition-colors hover:bg-gray-50/80 dark:hover:bg-slate-800/50"
                     >
                       <td className="px-5 py-3.5">
                         <div className="flex flex-wrap items-center gap-2">
@@ -268,37 +277,39 @@ export const CostsPage: React.FC = () => {
                           {cost.isDemo && <DemoBadge />}
                         </div>
                         {cost.observacao && (
-                          <p className="mt-0.5 text-xs text-gray-500 dark:text-slate-400">
+                          <p className="mt-0.5 text-xs text-gray-600 dark:text-slate-400">
                             {cost.observacao}
                           </p>
                         )}
                       </td>
                       <td className="px-4 py-3.5">
-                        <span className="inline-flex rounded-lg bg-[#F3F4F6] px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-slate-800 dark:text-slate-300">
+                        <span className="inline-flex rounded-lg bg-[#F3F4F6] px-2.5 py-1 text-xs font-medium text-gray-700 dark:bg-[#1A2333] dark:text-slate-200">
                           {cost.categoria}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 text-right font-semibold text-[#111827] tabular-nums dark:text-white">
+                      <td className="whitespace-nowrap px-4 py-3.5 text-right font-semibold text-[#111827] tabular-nums dark:text-white">
                         {formatCurrencyBRL(cost.valor)}
                       </td>
-                      <td className="px-4 py-3.5 text-right text-xs text-gray-500 tabular-nums dark:text-slate-400">
+                      <td className="whitespace-nowrap px-4 py-3.5 text-right text-xs font-medium text-gray-600 tabular-nums dark:text-slate-300">
                         {pct.toFixed(1).replace('.', ',')}%
                       </td>
                       <td className="px-5 py-3.5 text-right">
-                        <div className="inline-flex items-center gap-1">
+                        <div className="inline-flex items-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => openEditForm(cost)}
+                            title="Editar despesa"
                             aria-label={`Editar ${cost.nome}`}
-                            className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-[#111827] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-gray-500 transition-colors hover:border-gray-200 hover:bg-gray-100 hover:text-[#111827] dark:text-slate-300 dark:hover:border-slate-700 dark:hover:bg-slate-800 dark:hover:text-white"
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button
                             type="button"
                             onClick={() => setDeleteTarget(cost)}
+                            title="Excluir despesa"
                             aria-label={`Excluir ${cost.nome}`}
-                            className="rounded-lg p-2 text-gray-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:text-slate-400 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                            className="flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-gray-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:text-slate-300 dark:hover:border-red-900/60 dark:hover:bg-red-950/50 dark:hover:text-red-400"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -316,10 +327,13 @@ export const CostsPage: React.FC = () => {
       {/* Add / Edit Modal */}
       {formOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[1px]"
+          className="no-print fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[1px]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="cost-modal-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setFormOpen(false);
+          }}
         >
           <div className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-6 shadow-xl dark:border-slate-800 dark:bg-[#111827]">
             <div className="flex items-center justify-between">
@@ -353,7 +367,7 @@ export const CostsPage: React.FC = () => {
                   placeholder="Ex.: Internet fibra óptica"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                 />
               </div>
 
@@ -369,7 +383,7 @@ export const CostsPage: React.FC = () => {
                     id="cost-category"
                     value={categoria}
                     onChange={(e) => setCategoria(e.target.value as CostCategory)}
-                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                   >
                     {COST_CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
@@ -398,7 +412,7 @@ export const CostsPage: React.FC = () => {
                       placeholder="149.90"
                       value={valorStr}
                       onChange={(e) => setValorStr(e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-3.5 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                      className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-3.5 text-sm font-medium text-[#111827] outline-none tabular-nums focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                     />
                   </div>
                 </div>
@@ -417,7 +431,7 @@ export const CostsPage: React.FC = () => {
                   placeholder="Ex.: Rateio home office ou plano anual parcelado"
                   value={observacao}
                   onChange={(e) => setObservacao(e.target.value)}
-                  className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-[#111827] outline-none focus:border-[#16A34A] dark:border-slate-600/80 dark:bg-[#1A2333] dark:text-white"
                 />
               </div>
 

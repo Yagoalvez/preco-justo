@@ -1,217 +1,68 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   AppState,
-  COST_CATEGORIES,
   CalculationHistoryItem,
-  CostCategory,
   FinancialProfile,
   GoalSettings,
   MonthlyCost,
   PageId,
   ProfessionalSettings,
   QuoteDraft,
-  SERVICE_CATEGORIES,
-  ServiceCategory,
   ServiceFormInput,
   ServiceItem,
   ThemeMode,
   ToastMessage,
 } from '../types';
-import { buildDemoBundle } from '../data/demoData';
+import { buildDemoBundle, DEMO_GOAL } from '../data/demoData';
 import { generateId } from '../utils/format';
+import {
+  BACKUP_SCHEMA_VERSION,
+  BackupParseResult,
+  DEFAULT_GOAL,
+  DEFAULT_PROFESSIONAL,
+  DEFAULT_PROFILE,
+  DEFAULT_STATE,
+  parseAndValidateBackup,
+  sanitizeStatePayload,
+} from '../utils/backup';
 
 const STORAGE_KEY = 'preco_justo_app_state_v1';
-const BACKUP_SCHEMA_VERSION = 2;
 
-const DEFAULT_PROFILE: FinancialProfile = {
-  remuneracaoMensal: 0,
-  usarCustosMensaisAutomaticos: true,
-  custosFixosManuais: 0,
-  diasTrabalhadosMes: 20,
-  horasProdutivasDia: 6,
-  percentualFaturavel: 70,
-  margemLucroPadrao: 25,
-  impostosTaxasPadrao: 6,
-};
-
-const DEFAULT_PROFESSIONAL: ProfessionalSettings = {
-  nomeProfissional: '',
-  especialidade: '',
-  email: '',
-  telefone: '',
-  documento: '',
-  cidade: '',
-  validadePadraoDias: 15,
-  observacoesPadrao:
-    'Pagamento: 50% na aprovação e 50% na entrega. Alterações fora do escopo descrito serão orçadas separadamente.',
-};
-
-const DEFAULT_GOAL: GoalSettings = {
-  metaFaturamentoMensal: 0,
-  mixQuantidades: {},
-};
-
-const DEFAULT_STATE: AppState = {
-  theme: 'light',
-  profile: DEFAULT_PROFILE,
-  costs: [],
-  services: [],
-  history: [],
-  professional: DEFAULT_PROFESSIONAL,
-  goal: DEFAULT_GOAL,
-  onboardingCompleted: false,
-};
-
-function sanitizeNumber(value: unknown, fallback: number, min = -Infinity, max = Infinity): number {
-  const num = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(num)) return fallback;
-  return Math.min(max, Math.max(min, num));
+interface InitialLoadResult {
+  state: AppState;
+  storageWarning: string | null;
 }
 
-function sanitizeCostCategory(value: unknown): CostCategory {
-  return (COST_CATEGORIES as readonly string[]).includes(String(value))
-    ? (value as CostCategory)
-    : 'Outros';
-}
-
-function sanitizeServiceCategory(value: unknown): ServiceCategory {
-  return (SERVICE_CATEGORIES as readonly string[]).includes(String(value))
-    ? (value as ServiceCategory)
-    : 'Outros';
-}
-
-function sanitizeStatePayload(raw: Partial<AppState>, fallbackTheme: ThemeMode = 'light'): AppState {
-  const rawProfile = raw.profile ?? ({} as Partial<FinancialProfile>);
-  const rawProfessional = raw.professional ?? ({} as Partial<ProfessionalSettings>);
-  const rawGoal = raw.goal ?? ({} as Partial<GoalSettings>);
-
-  const costs: MonthlyCost[] = Array.isArray(raw.costs)
-    ? raw.costs
-        .filter((c) => c && typeof c === 'object' && typeof c.nome === 'string')
-        .map((c) => ({
-          id: typeof c.id === 'string' && c.id ? c.id : generateId('cost'),
-          nome: c.nome.trim().slice(0, 120) || 'Despesa',
-          categoria: sanitizeCostCategory(c.categoria),
-          valor: sanitizeNumber(c.valor, 0, 0),
-          observacao: typeof c.observacao === 'string' ? c.observacao.slice(0, 240) : undefined,
-          isDemo: Boolean(c.isDemo),
-          createdAt: typeof c.createdAt === 'string' ? c.createdAt : new Date().toISOString(),
-        }))
-    : [];
-
-  const services: ServiceItem[] = Array.isArray(raw.services)
-    ? raw.services
-        .filter((s) => s && typeof s === 'object' && typeof s.nome === 'string')
-        .map((s) => ({
-          id: typeof s.id === 'string' && s.id ? s.id : generateId('srv'),
-          nome: s.nome.trim().slice(0, 140) || 'Serviço',
-          categoria: sanitizeServiceCategory(s.categoria),
-          descricao: typeof s.descricao === 'string' ? s.descricao.slice(0, 1000) : '',
-          tempoEstimado: sanitizeNumber(s.tempoEstimado, 1, 0.1),
-          custoAdicional: sanitizeNumber(s.custoAdicional, 0, 0),
-          precoRecomendado: sanitizeNumber(s.precoRecomendado, 0, 0),
-          margemLucro: sanitizeNumber(s.margemLucro, DEFAULT_PROFILE.margemLucroPadrao, 0, 99),
-          impostosTaxas: sanitizeNumber(s.impostosTaxas, DEFAULT_PROFILE.impostosTaxasPadrao, 0, 99),
-          isDemo: Boolean(s.isDemo),
-          createdAt: typeof s.createdAt === 'string' ? s.createdAt : new Date().toISOString(),
-          updatedAt: typeof s.updatedAt === 'string' ? s.updatedAt : new Date().toISOString(),
-        }))
-    : [];
-
-  const history: CalculationHistoryItem[] = Array.isArray(raw.history)
-    ? raw.history
-        .filter(
-          (h) =>
-            h &&
-            typeof h === 'object' &&
-            typeof h.serviceName === 'string' &&
-            h.inputs &&
-            h.result
-        )
-        .map((h) => ({
-          id: typeof h.id === 'string' && h.id ? h.id : generateId('calc'),
-          data: typeof h.data === 'string' ? h.data : new Date().toISOString(),
-          serviceName: h.serviceName.trim().slice(0, 140) || 'Cálculo',
-          categoria: sanitizeServiceCategory(h.categoria),
-          descricao: typeof h.descricao === 'string' ? h.descricao.slice(0, 1000) : '',
-          inputs: h.inputs,
-          result: h.result,
-          isDemo: Boolean(h.isDemo),
-        }))
-    : [];
-
-  const mixQuantidades: Record<string, number> = {};
-  if (rawGoal.mixQuantidades && typeof rawGoal.mixQuantidades === 'object') {
-    for (const [key, qty] of Object.entries(rawGoal.mixQuantidades)) {
-      const safeQty = Math.floor(sanitizeNumber(qty, 0, 0, 9999));
-      if (safeQty > 0) mixQuantidades[key] = safeQty;
-    }
-  }
-
-  const hasExistingData =
-    costs.length > 0 ||
-    services.length > 0 ||
-    history.length > 0 ||
-    sanitizeNumber(rawProfile.remuneracaoMensal, 0, 0) > 0;
-
-  return {
-    theme: raw.theme === 'dark' || raw.theme === 'light' ? raw.theme : fallbackTheme,
-    profile: {
-      remuneracaoMensal: sanitizeNumber(rawProfile.remuneracaoMensal, DEFAULT_PROFILE.remuneracaoMensal, 0),
-      usarCustosMensaisAutomaticos:
-        typeof rawProfile.usarCustosMensaisAutomaticos === 'boolean'
-          ? rawProfile.usarCustosMensaisAutomaticos
-          : DEFAULT_PROFILE.usarCustosMensaisAutomaticos,
-      custosFixosManuais: sanitizeNumber(rawProfile.custosFixosManuais, DEFAULT_PROFILE.custosFixosManuais, 0),
-      diasTrabalhadosMes: sanitizeNumber(rawProfile.diasTrabalhadosMes, DEFAULT_PROFILE.diasTrabalhadosMes, 1, 31),
-      horasProdutivasDia: sanitizeNumber(rawProfile.horasProdutivasDia, DEFAULT_PROFILE.horasProdutivasDia, 0.5, 24),
-      percentualFaturavel: sanitizeNumber(rawProfile.percentualFaturavel, DEFAULT_PROFILE.percentualFaturavel, 1, 100),
-      margemLucroPadrao: sanitizeNumber(rawProfile.margemLucroPadrao, DEFAULT_PROFILE.margemLucroPadrao, 0, 99),
-      impostosTaxasPadrao: sanitizeNumber(rawProfile.impostosTaxasPadrao, DEFAULT_PROFILE.impostosTaxasPadrao, 0, 99),
-    },
-    costs,
-    services,
-    history,
-    professional: {
-      nomeProfissional:
-        typeof rawProfessional.nomeProfissional === 'string'
-          ? rawProfessional.nomeProfissional
-          : DEFAULT_PROFESSIONAL.nomeProfissional,
-      especialidade:
-        typeof rawProfessional.especialidade === 'string'
-          ? rawProfessional.especialidade
-          : DEFAULT_PROFESSIONAL.especialidade,
-      email: typeof rawProfessional.email === 'string' ? rawProfessional.email : DEFAULT_PROFESSIONAL.email,
-      telefone:
-        typeof rawProfessional.telefone === 'string' ? rawProfessional.telefone : DEFAULT_PROFESSIONAL.telefone,
-      documento:
-        typeof rawProfessional.documento === 'string' ? rawProfessional.documento : DEFAULT_PROFESSIONAL.documento,
-      cidade: typeof rawProfessional.cidade === 'string' ? rawProfessional.cidade : DEFAULT_PROFESSIONAL.cidade,
-      validadePadraoDias: Math.round(
-        sanitizeNumber(rawProfessional.validadePadraoDias, DEFAULT_PROFESSIONAL.validadePadraoDias, 1, 365)
-      ),
-      observacoesPadrao:
-        typeof rawProfessional.observacoesPadrao === 'string'
-          ? rawProfessional.observacoesPadrao
-          : DEFAULT_PROFESSIONAL.observacoesPadrao,
-    },
-    goal: {
-      metaFaturamentoMensal: sanitizeNumber(rawGoal.metaFaturamentoMensal, 0, 0),
-      mixQuantidades,
-    },
-    onboardingCompleted:
-      typeof raw.onboardingCompleted === 'boolean' ? raw.onboardingCompleted : hasExistingData,
-  };
-}
-
-function loadInitialState(): AppState {
+function loadInitialState(): InitialLoadResult {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_STATE;
-    const parsed = JSON.parse(raw) as Partial<AppState>;
-    return sanitizeStatePayload(parsed);
+    if (!raw) {
+      return { state: DEFAULT_STATE, storageWarning: null };
+    }
+    try {
+      const parsed = JSON.parse(raw) as Partial<AppState>;
+      return { state: sanitizeStatePayload(parsed), storageWarning: null };
+    } catch {
+      return {
+        state: DEFAULT_STATE,
+        storageWarning:
+          'Os dados salvos anteriormente no navegador estavam corrompidos e o aplicativo foi restaurado para o estado inicial. Se possuir um backup JSON, importe-o em Configurações.',
+      };
+    }
   } catch {
-    return DEFAULT_STATE;
+    return {
+      state: DEFAULT_STATE,
+      storageWarning:
+        'O armazenamento local do navegador (LocalStorage) está indisponível ou bloqueado. Suas alterações podem não ser mantidas ao fechar a aba — exporte backups JSON em Configurações.',
+    };
   }
 }
 
@@ -227,9 +78,12 @@ interface AppContextValue {
   setActivePage: (page: PageId) => void;
   totalMonthlyCosts: number;
   hasDemoData: boolean;
+  storageWarning: string | null;
+  dismissStorageWarning: () => void;
   toasts: ToastMessage[];
   notify: (toast: Omit<ToastMessage, 'id'>) => void;
   dismissToast: (id: string) => void;
+  clearToasts: () => void;
   toggleTheme: () => void;
   setTheme: (theme: ThemeMode) => void;
   updateProfile: (patch: Partial<FinancialProfile>) => void;
@@ -248,6 +102,8 @@ interface AppContextValue {
   clearDemoData: () => void;
   resetAllData: () => void;
   createBackupJson: () => string;
+  previewBackup: (json: string) => BackupParseResult;
+  applyBackupState: (restored: AppState) => void;
   importBackup: (json: string) => boolean;
   quoteModalDraft: QuoteDraft | null;
   openQuoteModal: (draft: QuoteDraft) => void;
@@ -263,35 +119,31 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state, setState] = useState<AppState>(() => loadInitialState());
+  const initialRef = useRef<InitialLoadResult | null>(null);
+  if (initialRef.current === null) {
+    initialRef.current = loadInitialState();
+  }
+
+  const [state, setState] = useState<AppState>(() => initialRef.current!.state);
+  const [storageWarning, setStorageWarning] = useState<string | null>(
+    () => initialRef.current!.storageWarning
+  );
   const [activePage, setActivePage] = useState<PageId>('overview');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [quoteModalDraft, setQuoteModalDraft] = useState<QuoteDraft | null>(null);
   const [calculatorPrefill, setCalculatorPrefill] = useState<CalculatorPrefill | null>(null);
-  const [onboardingOpen, setOnboardingOpen] = useState<boolean>(() => {
-    const initial = loadInitialState();
-    return !initial.onboardingCompleted;
-  });
+  const [onboardingOpen, setOnboardingOpen] = useState<boolean>(
+    () => !initialRef.current!.state.onboardingCompleted
+  );
 
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      // Ignore storage quota errors gracefully
-    }
-  }, [state]);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    if (state.theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-  }, [state.theme]);
+  const writeFailedRef = useRef<boolean>(false);
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const clearToasts = useCallback(() => {
+    setToasts([]);
   }, []);
 
   const notify = useCallback((toast: Omit<ToastMessage, 'id'>) => {
@@ -301,6 +153,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4200);
   }, []);
+
+  const dismissStorageWarning = useCallback(() => {
+    setStorageWarning(null);
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      if (writeFailedRef.current) {
+        writeFailedRef.current = false;
+        setStorageWarning(null);
+      }
+    } catch (err) {
+      const isQuota =
+        err instanceof DOMException &&
+        (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014);
+      const message = isQuota
+        ? 'O espaço de armazenamento local (LocalStorage) atingiu o limite. Exporte um backup JSON e remova itens antigos do histórico.'
+        : 'Não foi possível salvar no armazenamento local do navegador (LocalStorage bloqueado ou indisponível). Exporte um backup JSON para não perder seus dados.';
+      setStorageWarning(message);
+      if (!writeFailedRef.current) {
+        writeFailedRef.current = true;
+        notify({
+          type: 'error',
+          title: 'Falha ao salvar localmente',
+          description: message,
+        });
+      }
+    }
+  }, [state, notify]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (state.theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [state.theme]);
 
   const totalMonthlyCosts = useMemo(
     () => state.costs.reduce((sum, item) => sum + (Number.isFinite(item.valor) ? item.valor : 0), 0),
@@ -524,6 +415,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         professional: prev.professional.nomeProfissional.trim()
           ? prev.professional
           : bundle.professional,
+        goal:
+          prev.goal.metaFaturamentoMensal > 0
+            ? prev.goal
+            : { ...bundle.goal, mixQuantidades: prev.goal.mixQuantidades },
         costs: [...nonDemoCosts, ...bundle.costs],
         services: [...nonDemoServices, ...bundle.services],
         history: [...nonDemoHistory, ...bundle.history],
@@ -534,7 +429,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       type: 'success',
       title: 'Dados demonstrativos carregados',
       description:
-        'Despesas, serviços e cálculos de exemplo foram adicionados e marcados como demonstrativos.',
+        'Despesas, serviços, meta mensal e cálculos de exemplo foram adicionados e marcados como demonstrativos.',
     });
   }, [notify]);
 
@@ -543,14 +438,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const remainingCosts = prev.costs.filter((c) => !c.isDemo);
       const remainingServices = prev.services.filter((s) => !s.isDemo);
       const remainingHistory = prev.history.filter((h) => !h.isDemo);
+      const noUserRecords =
+        remainingCosts.length === 0 &&
+        remainingServices.length === 0 &&
+        remainingHistory.length === 0;
       const isDefaultDemoProf =
         prev.professional.nomeProfissional === 'Studio Clara Mendes' &&
         prev.professional.email === 'contato@studioclaramendes.com.br';
-      const isDefaultDemoProfile =
-        remainingCosts.length === 0 &&
-        remainingServices.length === 0 &&
-        remainingHistory.length === 0 &&
-        prev.profile.remuneracaoMensal === 5500;
+      const isDefaultDemoProfile = noUserRecords && prev.profile.remuneracaoMensal === 5500;
+      const isDefaultDemoGoal =
+        noUserRecords && prev.goal.metaFaturamentoMensal === DEMO_GOAL.metaFaturamentoMensal;
 
       const remainingServiceIds = new Set(remainingServices.map((s) => s.id));
       const cleanedMix: Record<string, number> = {};
@@ -565,7 +462,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         history: remainingHistory,
         professional: isDefaultDemoProf ? DEFAULT_PROFESSIONAL : prev.professional,
         profile: isDefaultDemoProfile ? DEFAULT_PROFILE : prev.profile,
-        goal: { ...prev.goal, mixQuantidades: cleanedMix },
+        goal: isDefaultDemoGoal
+          ? DEFAULT_GOAL
+          : { ...prev.goal, mixQuantidades: cleanedMix },
       };
     });
     notify({
@@ -598,52 +497,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return JSON.stringify(payload, null, 2);
   }, [state]);
 
+  const previewBackup = useCallback(
+    (json: string): BackupParseResult => {
+      return parseAndValidateBackup(json, state.theme);
+    },
+    [state.theme]
+  );
+
+  const applyBackupState = useCallback(
+    (restored: AppState) => {
+      setState(restored);
+      setOnboardingOpen(false);
+      notify({
+        type: 'success',
+        title: 'Backup restaurado com sucesso',
+        description: `${restored.costs.length} despesas, ${restored.services.length} serviços e ${restored.history.length} cálculos importados.`,
+      });
+    },
+    [notify]
+  );
+
   const importBackup = useCallback(
     (json: string): boolean => {
-      try {
-        const parsed = JSON.parse(json) as
-          | { app?: string; schemaVersion?: number; data?: Partial<AppState> }
-          | Partial<AppState>;
-
-        if (!parsed || typeof parsed !== 'object') {
-          throw new Error('Formato inválido');
-        }
-
-        const candidateData: Partial<AppState> =
-          'data' in parsed && parsed.data && typeof parsed.data === 'object'
-            ? parsed.data
-            : (parsed as Partial<AppState>);
-
-        const hasRecognizedKeys =
-          'profile' in candidateData ||
-          'costs' in candidateData ||
-          'services' in candidateData ||
-          'history' in candidateData ||
-          'professional' in candidateData;
-
-        if (!hasRecognizedKeys) {
-          throw new Error('Estrutura de backup não reconhecida');
-        }
-
-        const restored = sanitizeStatePayload(candidateData, state.theme);
-        setState(restored);
-        setOnboardingOpen(false);
-        notify({
-          type: 'success',
-          title: 'Backup restaurado com sucesso',
-          description: `${restored.costs.length} despesas, ${restored.services.length} serviços e ${restored.history.length} cálculos importados.`,
-        });
-        return true;
-      } catch {
+      const outcome = parseAndValidateBackup(json, state.theme);
+      if (!outcome.ok) {
         notify({
           type: 'error',
           title: 'Erro ao importar backup',
-          description: 'O arquivo selecionado não é um backup JSON válido do Preço Justo.',
+          description: outcome.error,
         });
         return false;
       }
+      applyBackupState(outcome.state);
+      return true;
     },
-    [notify, state.theme]
+    [applyBackupState, notify, state.theme]
   );
 
   const openQuoteModal = useCallback((draft: QuoteDraft) => {
@@ -681,9 +569,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setActivePage,
       totalMonthlyCosts,
       hasDemoData,
+      storageWarning,
+      dismissStorageWarning,
       toasts,
       notify,
       dismissToast,
+      clearToasts,
       toggleTheme,
       setTheme,
       updateProfile,
@@ -702,6 +593,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       clearDemoData,
       resetAllData,
       createBackupJson,
+      previewBackup,
+      applyBackupState,
       importBackup,
       quoteModalDraft,
       openQuoteModal,
@@ -718,9 +611,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       activePage,
       totalMonthlyCosts,
       hasDemoData,
+      storageWarning,
+      dismissStorageWarning,
       toasts,
       notify,
       dismissToast,
+      clearToasts,
       toggleTheme,
       setTheme,
       updateProfile,
@@ -739,6 +635,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       clearDemoData,
       resetAllData,
       createBackupJson,
+      previewBackup,
+      applyBackupState,
       importBackup,
       quoteModalDraft,
       openQuoteModal,
