@@ -8,6 +8,8 @@
 - **Moeda:** Real brasileiro (`BRL`)
 - **Categoria:** SaaS de gestão financeira e precificação inteligente de serviços
 - **Repositório oficial:** `https://github.com/Yagoalvez/preco-justo`
+- **URL pública de produção:** `https://preco-justo-tau.vercel.app`
+- **Versão publicada:** `v1.0.0`
 
 ## 2. Objetivos
 
@@ -156,12 +158,15 @@ Estética de SaaS financeiro limpo, moderno e sóbrio, com contraste adequado em
 
 ## 11. Estratégia de Publicação (Vercel)
 
-- **Framework preset:** Vite
+- **URL pública definitiva:** `https://preco-justo-tau.vercel.app` (alias alternativo: `https://preco-justo-titanium-blaze.vercel.app`)
+- **Projeto Vercel:** `preco-justo` (plano gratuito Hobby, sem serviços pagos)
+- **Framework preset:** Vite (`Node.js 26.x`)
 - **Build Command:** `npm run build`
 - **Output Directory:** `dist`
-- **Install Command:** `npm install`
-- **Root Directory:** raiz do projeto
+- **Install Command:** `npm install` (compatível com `package-lock.json`)
+- **Root Directory:** raiz do projeto (`.`)
 - **SPA Rewrite:** `vercel.json` redireciona `/(.*)` para `/index.html`.
+- **Fluxo de atualizações futuras:** validar localmente (`npm test && npm run lint && npm run build`), enviar à branch `main` no GitHub (`git push origin main`) e publicar com `vercel deploy --prod` (ou habilitar deploy automático conectando o Vercel GitHub App em *Settings → Git* do projeto na Vercel).
 - **Observação de persistência:** dados salvos em `LocalStorage` são locais por dispositivo/navegador e não sincronizam automaticamente entre aparelhos (usuário pode transferir via backup JSON).
 
 ## 12. Roadmap de Finalização

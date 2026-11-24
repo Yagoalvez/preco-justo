@@ -4,6 +4,10 @@
 
 Aplicação web completa de precificação inteligente voltada para profissionais autônomos, freelancers e pequenos empreendedores.
 
+- **Aplicação em produção (Vercel):** https://preco-justo-tau.vercel.app
+- **Repositório oficial (GitHub):** https://github.com/Yagoalvez/preco-justo
+- **Versão publicada:** `v1.0.0`
+
 ---
 
 ## O problema identificado
@@ -115,6 +119,24 @@ npm run build
 npm run preview
 ```
 
-### Publicação na Vercel
+### Publicação na Vercel e Atualizações Futuras
 
-O projeto já inclui `vercel.json` configurado para SPA. Basta importar o repositório na Vercel usando o preset padrão do **Vite** (`npm run build`, saída em `dist`).
+- **URL pública em produção:** https://preco-justo-tau.vercel.app
+- **Configuração:** preset **Vite** (`npm run build`, saída em `dist/`, rewrites SPA em `vercel.json`, plano gratuito Hobby).
+
+Para publicar novas atualizações no futuro:
+
+```bash
+# 1. Valide testes, tipos e build localmente
+npm test
+npm run lint
+npm run build
+
+# 2. Envie as alterações ao GitHub
+git add .
+git commit -m "feat: descrição da melhoria"
+git push origin main
+
+# 3. Publique em produção na Vercel (ou conecte o GitHub App no painel da Vercel para deploy automático)
+vercel deploy --prod
+```

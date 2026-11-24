@@ -15,6 +15,8 @@ Antes de propor ou executar alterações no projeto, leia sempre:
 - **Preserve a stack:** React 18, TypeScript, Vite, Tailwind CSS, Lucide React, Recharts, LocalStorage e Vitest.
 - **Não adicione dependências desnecessárias** e não introduza banco de dados externo, autenticação, pagamentos ou APIs externas de IA no MVP atual.
 - **Preserve compatibilidade** com Windows e publicação estática na Vercel (`vercel.json` + `npm run build` -> `dist/`).
+- **Ambiente de produção publicado:** `https://preco-justo-tau.vercel.app` (projeto `preco-justo`, plano gratuito Hobby). Nunca altere a configuração de deploy ou contrate serviços pagos sem autorização explícita.
+- **Nunca versione** `.vercel/`, `.env.local`, `node_modules/`, `dist/` ou tokens/credenciais.
 
 ## 3. Regras Financeiras Invioláveis
 
